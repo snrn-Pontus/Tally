@@ -1,0 +1,62 @@
+# SNRN Tally
+
+**Free bag slots and ammo on WoW: Forever's gamepad HUD.**
+
+In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothing on screen tells you your bags are full or you are about to run out of arrows. Tally puts both numbers in the bottom-right corner, in the same round-slot style as the crossbar.
+
+## What's new
+
+- **0.1.0**: First release.
+
+Full history on the Changelog tab of each file.
+
+<!-- Screenshot: the counters in the bottom-right corner. Replace with the media.forgecdn.net URL after uploading. -->
+
+## What you get
+
+| Counter | Shows |
+| --- | --- |
+| Bags | Free slots in your backpack and normal bags |
+| Ammo | Every arrow or bullet of the equipped type in your bags |
+
+- Yellow when low, red at zero. Both thresholds are yours to set.
+- Quivers, ammo pouches and other special bags don't count as free space, because loot can't go there.
+- The ammo counter only appears for characters who use ammo: a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped.
+- Hover for free slots per bag, quiver slots and any other ammo you carry.
+
+## Setup
+
+Nothing to do. Switch to gamepad mode and the counters appear in the bottom-right corner. Move them in Edit Mode, or with `/tally unlock`.
+
+<!-- Screenshot: the bag and ammo tooltips. -->
+
+## Settings
+
+**Settings > AddOns > Tally** (or `/tally`): what to show, how to show bag slots (free, free / total, used / total), when to turn yellow, gamepad-only or always, side by side or stacked, and size.
+
+## Works with a controller
+
+The counters only show in gamepad mode by default. The Settings page is built so WoW: Forever's gamepad cursor never touches it, which avoids the client freezing when Settings is closed with the controller.
+
+## Slash commands
+
+```
+/tally           open the settings page
+/tally status    bag slots per bag and ammo, in chat
+/tally unlock    move the counters outside Edit Mode
+/tally lock      lock them again
+/tally reset     back to the bottom-right corner
+```
+
+## Notes
+
+- Built for **World of Warcraft: Forever**. It only uses standard bag and inventory APIs, so it should also work on other clients that have them.
+
+## Part of the SNRN family
+
+- **[SNRN Rummage](https://www.curseforge.com/wow/addons/snrn-rummage)**: one action slot per item type that always uses the best item in your bags.
+- **[SNRN Backhand](https://www.curseforge.com/wow/addons/snrn-backhand)**: extra action slots for your controller's rear paddles, built into Forever's crossbar.
+
+## Reporting problems
+
+Run `/tally status` and include the output with your report.
