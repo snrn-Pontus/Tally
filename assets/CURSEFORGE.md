@@ -54,8 +54,8 @@ The counters only show in gamepad mode by default. The Settings page is built so
 
 ## Part of the SNRN family
 
-- **[SNRN Rummage](https://www.curseforge.com/wow/addons/snrn-rummage)**: one action slot per item type that always uses the best item in your bags.
-- **[SNRN Backhand](https://www.curseforge.com/wow/addons/snrn-backhand)**: extra action slots for your controller's rear paddles, built into Forever's crossbar.
+- **[SNRN Rummage](https://www.curseforge.com/wow/addons/snrn-rummage)**: one action slot per item type that always uses the best food, drink, potion, bandage or quest item in your bags. Tally tells you when your bags are full; Rummage makes sure the right stack gets used.
+- **[SNRN Backhand](https://www.curseforge.com/wow/addons/snrn-backhand)**: four extra action slots for your controller's rear paddles (Xbox Elite, DualSense Edge, Steam Input back buttons), built into Forever's native crossbar.
 
 ## Reporting problems
 
