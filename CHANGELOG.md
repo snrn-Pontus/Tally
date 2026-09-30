@@ -1,5 +1,9 @@
 # Tally changelog
 
+## 0.1.1
+
+- Fixed: clicking the bag counter could freeze the game in gamepad mode. Opening the bags from Tally set off an endless "Tally has been blocked from an action only available to the Blizzard UI" loop in Forever. The counters are now hover-only; open your bags with the controller as usual.
+
 ## 0.1.0 — First release
 
 Tally is part of the SNRN addon family.

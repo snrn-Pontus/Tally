@@ -6,6 +6,7 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 ## What's new
 
+- **0.1.1**: Clicking the bag counter no longer freezes the game in gamepad mode. The counters are hover-only now.
 - **0.1.0**: First release.
 
 Full history on the Changelog tab of each file.

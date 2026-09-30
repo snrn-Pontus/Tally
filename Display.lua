@@ -112,7 +112,6 @@ local function ShowBagTooltip(owner)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Quivers, ammo pouches and other special bags are not counted: they cannot take loot.", 0.62, 0.62, 0.62, true)
     end
-    GameTooltip:AddLine("Click to open your bags.", 0.5, 1, 0.5)
     GameTooltip:Show()
 end
 
@@ -147,10 +146,13 @@ end
 -- Readouts
 --------------------------------------------------------------------------------
 
-local function CreateReadout(key, onEnter, onClick)
-    local readout = CreateFrame("Button", "TallyReadout" .. key, container)
+-- Hover-only on purpose. Opening the bags from an addon click taints the
+-- gamepad controls that come with them, and Forever then loops forever on the
+-- ADDON_ACTION_FORBIDDEN popup for SetPreferredGamepadInteractTarget.
+local function CreateReadout(key, onEnter)
+    local readout = CreateFrame("Frame", "TallyReadout" .. key, container)
     readout:SetHeight(ICON_SIZE)
-    readout:RegisterForClicks("LeftButtonUp")
+    readout:EnableMouse(true)
 
     local slot = CreateFrame("Frame", nil, readout)
     slot:SetSize(ICON_SIZE, ICON_SIZE)
@@ -198,9 +200,6 @@ local function CreateReadout(key, onEnter, onClick)
     readout:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
-    if onClick then
-        readout:SetScript("OnClick", onClick)
-    end
 
     readouts[key] = readout
     return readout
@@ -406,11 +405,7 @@ function ns.display.Create()
     container:SetMovable(true)
     container:SetSize(ICON_SIZE, ICON_SIZE)
 
-    CreateReadout("bags", ShowBagTooltip, function()
-        if ToggleAllBags then
-            ToggleAllBags()
-        end
-    end)
+    CreateReadout("bags", ShowBagTooltip)
     CreateReadout("ammo", ShowAmmoTooltip)
     container.editOverlay = CreateEditOverlay()
 

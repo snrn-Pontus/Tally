@@ -20,7 +20,7 @@ Each counter is a round slot in the style of the crossbar with the number beside
 - The number turns **yellow** when it gets low (4 free slots, 200 ammo by default) and **red** at zero.
 - Quivers, ammo pouches, soul bags and profession bags are not counted as free bag slots: loot cannot go there. The bag tooltip still lists them.
 - The ammo counter appears when you have a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped. It shows the equipped ammo's icon.
-- Hover a counter for the details: free slots per bag, quiver slots, and any other ammo in your bags. Click the bag counter to open your bags.
+- Hover a counter for the details: free slots per bag, quiver slots, and any other ammo in your bags.
 
 ## Gamepad mode only
 

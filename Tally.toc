@@ -2,7 +2,7 @@
 ## Title: |cff33ccffSNRN|r Tally
 ## Notes: Free bag slots and ammo count in the bottom-right corner of WoW: Forever's gamepad HUD, which shows neither.
 ## Author: SillyNameRandomNumber
-## Version: 0.1.0
+## Version: 0.1.1
 ## IconTexture: Interface\AddOns\Tally\Media\Icon.tga
 ## X-Curse-Project-ID: 1719385
 ## X-License: MIT
