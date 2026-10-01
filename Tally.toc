@@ -8,7 +8,7 @@
 ## X-License: MIT
 ## X-Website: https://github.com/snrn-Pontus/Tally
 ## X-Category: Bags & Inventory
-## Category: Bags & Inventory
+## Category: SNRN
 ## Group: SNRN
 ## SavedVariables: TallyDB
 
