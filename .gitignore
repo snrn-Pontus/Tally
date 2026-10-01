@@ -32,3 +32,6 @@ dist/
 # Python scratch (Pillow scripts used to build the logo)
 __pycache__/
 *.pyc
+
+# Screenshots for the CurseForge page (uploaded there, not shipped)
+screenshots/

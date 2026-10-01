@@ -11,7 +11,7 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 Full history on the Changelog tab of each file.
 
-<!-- Screenshot: the counters in the bottom-right corner. Replace with the media.forgecdn.net URL after uploading. -->
+![The bag and ammo counters with the bag tooltip: free slots per bag, quiver and herb pouch left out](https://media.forgecdn.net/attachments/1997/349/bags-tooltip-png.png)
 
 ## What you get
 
@@ -29,11 +29,13 @@ Full history on the Changelog tab of each file.
 
 Nothing to do. Switch to gamepad mode and the counters appear in the bottom-right corner. Move them in Edit Mode, or with `/tally unlock`.
 
-<!-- Screenshot: the bag and ammo tooltips. -->
+![The ammo tooltip: arrows left in your bags and free quiver slots](https://media.forgecdn.net/attachments/1997/351/ammo-tooltip-png.png)
 
 ## Settings
 
 **Settings > AddOns > Tally** (or `/tally`): what to show, how to show bag slots (free, free / total, used / total), when to turn yellow, gamepad-only or always, side by side or stacked, and size.
+
+![The Tally settings page](https://media.forgecdn.net/attachments/1997/350/settings-png.png)
 
 ## Works with a controller
 
