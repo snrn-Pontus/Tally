@@ -6,6 +6,7 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 ## What's new
 
+- **0.2.0**: Click the bag counter to delete your cheapest grey item, confirmed in the tooltip. Reagent bags can get their own counter. Fixed a phantom "?" ammo counter with no ammo equipped.
 - **0.1.1**: Clicking the bag counter no longer freezes the game in gamepad mode. The counters are hover-only now.
 - **0.1.0**: First release.
 
@@ -24,6 +25,16 @@ Full history on the Changelog tab of each file.
 - Quivers, ammo pouches and other special bags don't count as free space, because loot can't go there.
 - The ammo counter only appears for characters who use ammo: a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped.
 - Hover for free slots per bag, quiver slots and any other ammo you carry.
+- Reagent bags are counted with your bags, or get a counter of their own.
+
+## Delete greys
+
+The bag tooltip names your cheapest grey item. Click the bag counter and the tooltip asks to delete it; click again to delete it, or move away to cancel. No bags or popups open, so it is safe in gamepad mode.
+
+- Optionally include white items, with trade goods, consumables, reagents and recipes kept by default.
+- Quest items, ammo, keys and anything a vendor won't buy are never offered.
+- Right-click to always keep an item; `/tally keep` manages the list.
+- With Auctionator, TradeSkillMaster or Auctioneer installed, greys that sell well on the auction house are not the ones offered.
 
 ## Setup
 
@@ -49,6 +60,7 @@ The counters only show in gamepad mode by default. The Settings page is built so
 /tally unlock    move the counters outside Edit Mode
 /tally lock      lock them again
 /tally reset     back to the bottom-right corner
+/tally keep      list, add or remove items never offered for deletion
 ```
 
 ## Notes
