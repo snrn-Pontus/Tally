@@ -43,7 +43,7 @@ If **Auctionator**, **TradeSkillMaster** or **Auctioneer** is installed, a grey 
 
 ## Disenchanting
 
-With Enchanting learned, a disenchant counter shows how many soulbound green, blue and purple weapons and armor are in your bags. Bind-on-equip items are left alone, since they can still go to the auction house. Hover it to see what a click would disenchant:
+With Enchanting learned, a disenchant counter shows how many soulbound green, blue and purple weapons and armor are in your bags. Bind-on-equip and account-bound items are left alone, since they can still be sold or used by another character. Hover it to see what a click would disenchant:
 
 - **Click** disenchants soulbound gear you can never wear: another class's item, or an armor or weapon type your class never learns (plate on a rogue, a wand on a warrior). It is only good for materials, so there is no confirmation.
 - **Shift-click** disenchants gear you could wear, now or later: once you reach its level, or train its proficiency (mail or plate at 40, a weapon skill from a weapon master). The modifier keeps that from happening by accident.
@@ -52,7 +52,7 @@ With Enchanting learned, a disenchant counter shows how many soulbound green, bl
 Disenchanting frees the item's slot, but the materials need a slot too unless they stack with ones you already carry. Tally knows what Classic gear most likely disenchants into (dust for armor, essence for weapons, shards for rare items, by item level) and checks whether your stacks have room for it:
 
 - **Bags not tight** (more free slots than **Yellow at free slots**): every soulbound item counts. Items that free a slot are offered first, then the one worth least at a vendor.
-- **Bags getting full**: only items whose likely material stacks with yours count, so every disenchant frees a slot.
+- **Bags getting full**: only items whose every possible result (dust, essence or shard for green gear; shard or Nexus Crystal for blue and purple) stacks with yours count, so every disenchant frees a slot.
 
 Gear better than what you wear is never offered: with **Never disenchant upgrades** on (the default), an item counts as an upgrade when it has a higher item level than the weakest item in its slot (both rings, both trinkets), or that slot is empty. With **Pawn** installed, Pawn's upgrade arrow decides instead. Items you cannot wear (red text on the tooltip: wrong armor type, class or level) are never upgrades. The tooltip lists the items held back and why.
 

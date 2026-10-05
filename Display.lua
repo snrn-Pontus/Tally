@@ -177,9 +177,9 @@ local function DisenchantResult(target)
     end
     local material = IconText(Tally.GetItemIcon(target.material), Tally.GetItemName(target.material))
     if target.freesSlot then
-        return "Frees a slot: likely " .. material .. ", which stacks with yours.", 0.25, 1, 0.25
+        return "Frees a slot: likely " .. material .. ", and every possible result stacks with yours.", 0.25, 1, 0.25
     end
-    return "Likely " .. material .. ", which needs a slot of its own.", 0.62, 0.62, 0.62
+    return "Likely " .. material .. ". Not every possible result stacks with yours, so it may need a slot.", 0.62, 0.62, 0.62
 end
 
 local function AddDisenchantTarget(target)

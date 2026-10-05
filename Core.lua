@@ -444,9 +444,7 @@ local ITEM_CLASS_ARMOR = Enum and Enum.ItemClass and Enum.ItemClass.Armor or 4
 local ITEM_QUALITY_UNCOMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Uncommon or 2
 local ITEM_QUALITY_EPIC = Enum and Enum.ItemQuality and Enum.ItemQuality.Epic or 4
 
--- What Classic gear disenchants into, by item level: uncommon armor mostly
--- gives the dust, uncommon weapons the essence, rare items the shard and
--- epics the shard or, past level 60, the Nexus Crystal. Items past the
+-- What Classic gear disenchants into, by item level band. Items past the
 -- table have no known result, so they never count as freeing a slot.
 local DISENCHANT_BANDS = {
     { maxLevel = 15, dust = 10940, essence = 10938, shard = 10978 },
@@ -488,18 +486,40 @@ function Tally.GetDisenchantIcon()
     return GetSpellTexture and GetSpellTexture(DISENCHANT_SPELL) or nil
 end
 
+local scanTooltip
+
+-- A hidden tooltip holding a bag item, for what only its text tells.
+local function ScanBagItem(bag, slot)
+    if not scanTooltip then
+        scanTooltip = CreateFrame("GameTooltip", "TallyScanTooltip", nil, "GameTooltipTemplate")
+    end
+    scanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scanTooltip:ClearLines()
+    scanTooltip:SetBagItem(bag, slot)
+    return scanTooltip
+end
+
+-- Bound to you alone. C_Item.IsBound is also true for account-bound items,
+-- which another character could still use, so the tooltip has to say
+-- "Soulbound".
 local function IsSoulbound(bag, slot)
     if C_Item and C_Item.IsBound and ItemLocation and ItemLocation.CreateFromBagAndSlot then
         local ok, bound = pcall(C_Item.IsBound, ItemLocation:CreateFromBagAndSlot(bag, slot))
-        if ok then
-            return bound == true
+        if ok and not bound then
+            return false
         end
     end
-    if C_Container and C_Container.GetContainerItemInfo then
-        local info = C_Container.GetContainerItemInfo(bag, slot)
-        return info ~= nil and info.isBound == true
+    local tooltip = ScanBagItem(bag, slot)
+    local soulbound = false
+    for i = 2, tooltip:NumLines() do
+        local line = _G["TallyScanTooltipTextLeft" .. i]
+        if line and line:GetText() == (ITEM_SOULBOUND or "Soulbound") then
+            soulbound = true
+            break
+        end
     end
-    return false
+    tooltip:Hide()
+    return soulbound
 end
 
 local function GetItemLevel(itemID, link)
@@ -512,25 +532,33 @@ local function GetMaxStack(itemID, kind)
     return getter and (select(8, getter(itemID))) or MATERIAL_STACK[kind]
 end
 
--- The material a disenchant most likely gives and its kind, or nil when the
--- item level is past the table.
-local function LikelyMaterial(classID, quality, level)
+-- Every material a disenchant can give, as { itemID, kind } pairs with the
+-- likely one first, or nil when the item level is past the table. Green
+-- gear rolls dust, essence or a shard; blue gear a shard, or rarely a Nexus
+-- Crystal from level 56; purple gear a Nexus Crystal from level 56.
+local function PossibleMaterials(classID, quality, level)
     if not level then
         return nil
     end
     for _, band in ipairs(DISENCHANT_BANDS) do
         if level <= band.maxLevel then
             if quality == ITEM_QUALITY_EPIC then
-                if band.crystal and level > 60 then
-                    return band.crystal, "crystal"
+                if band.crystal then
+                    return { { band.crystal, "crystal" } }
                 end
-                return band.shard, "epicShard"
+                return { { band.shard, "epicShard" } }
             elseif quality > ITEM_QUALITY_UNCOMMON then
-                return band.shard, "shard"
-            elseif classID == ITEM_CLASS_WEAPON then
-                return band.essence, "essence"
+                local materials = { { band.shard, "shard" } }
+                if band.crystal then
+                    materials[2] = { band.crystal, "crystal" }
+                end
+                return materials
             end
-            return band.dust, "dust"
+            local dust, essence = { band.dust, "dust" }, { band.essence, "essence" }
+            if classID == ITEM_CLASS_WEAPON then
+                return { essence, dust, { band.shard, "shard" } }
+            end
+            return { dust, essence, { band.shard, "shard" } }
         end
     end
     return nil
@@ -567,8 +595,6 @@ local EQUIP_SLOTS = {
     INVTYPE_TABARD = { 19 },
 }
 local OFF_HAND_SLOT = 17
-
-local scanTooltip
 
 -- A broken item's durability line is red, but it can be repaired.
 local DURABILITY_PATTERN = "^" .. (DURABILITY_TEMPLATE or "Durability %d / %d"):gsub("%%d", "%%d+") .. "$"
@@ -656,12 +682,7 @@ end
 -- never learn, is "never". Any other red text (level, an untrained but
 -- learnable proficiency, a profession, reputation) is "later".
 local function WearState(bag, slot, itemID)
-    if not scanTooltip then
-        scanTooltip = CreateFrame("GameTooltip", "TallyScanTooltip", nil, "GameTooltipTemplate")
-    end
-    scanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
-    scanTooltip:ClearLines()
-    scanTooltip:SetBagItem(bag, slot)
+    ScanBagItem(bag, slot)
     local state = "now"
     for i = 2, scanTooltip:NumLines() do
         for _, side in ipairs({ "Left", "Right" }) do
@@ -811,7 +832,7 @@ end
 -- each to offer. Disenchanting frees the item's slot, but the materials take
 -- a new slot unless they stack with what you carry. With room to spare
 -- (more free slots than the yellow warning) every candidate counts; with
--- bags getting full only items whose likely material has room for a full
+-- bags getting full only items whose every possible material has room for a full
 -- result in your stacks count. Upgrades over what you wear are held back
 -- and listed instead.
 local function FindDisenchants(bags)
@@ -860,13 +881,18 @@ local function FindDisenchants(bags)
     end
 
     for _, candidate in ipairs(candidates) do
-        local material, kind = LikelyMaterial(GetItemClass(candidate.itemID), candidate.quality, candidate.level)
-        candidate.material = material
-        candidate.freesSlot = false
-        if material and held[material] then
+        -- A slot is only freed for sure when every possible result fits in
+        -- the stacks you carry.
+        local materials = PossibleMaterials(GetItemClass(candidate.itemID), candidate.quality, candidate.level)
+        candidate.material = materials and materials[1][1]
+        candidate.freesSlot = materials ~= nil
+        for _, entry in ipairs(materials or {}) do
+            local material, kind = entry[1], entry[2]
             local stacks = held[material]
-            local room = stacks.stacks * GetMaxStack(material, kind) - stacks.count
-            candidate.freesSlot = room >= MATERIAL_YIELD[kind]
+            local room = stacks and stacks.stacks * GetMaxStack(material, kind) - stacks.count or 0
+            if room < MATERIAL_YIELD[kind] then
+                candidate.freesSlot = false
+            end
         end
         if candidate.freesSlot or not result.tight then
             result.count = result.count + 1
