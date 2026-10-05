@@ -6,6 +6,7 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 ## What's new
 
+- **0.3.0**: A disenchant counter for enchanters. Click to disenchant soulbound gear you can never wear, shift-click for gear you could; upgrades are never touched, and with full bags it only offers disenchants that free a slot. Herb, enchanting, soul and other profession bags get a counter of their own.
 - **0.2.0**: Click the bag counter to delete your cheapest grey item, confirmed in the tooltip. Reagent bags can get their own counter. Fixed a phantom "?" ammo counter with no ammo equipped.
 - **0.1.1**: Clicking the bag counter no longer freezes the game in gamepad mode. The counters are hover-only now.
 - **0.1.0**: First release.
@@ -19,10 +20,12 @@ Full history on the Changelog tab of each file.
 | Counter | Shows |
 | --- | --- |
 | Bags | Free slots in your backpack and normal bags |
+| Profession bag | Free slots in a herb, enchanting, soul or other profession bag, with its icon |
+| Disenchant | Soulbound gear you can disenchant, when you know Enchanting |
 | Ammo | Every arrow or bullet of the equipped type in your bags |
 
 - Yellow when low, red at zero. Both thresholds are yours to set.
-- Quivers, ammo pouches and other special bags don't count as free space, because loot can't go there.
+- Quivers, ammo pouches and other special bags don't count as free space, because loot can't go there. Profession bags show their own free slots instead, so you can see your herb bag still has room when your bags are full.
 - The ammo counter only appears for characters who use ammo: a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped.
 - Hover for free slots per bag, quiver slots and any other ammo you carry.
 - Reagent bags are counted with your bags, or get a counter of their own.
@@ -35,6 +38,16 @@ The bag tooltip names your cheapest grey item. Click the bag counter and the too
 - Quest items, ammo, keys and anything a vendor won't buy are never offered.
 - Right-click to always keep an item; `/tally keep` manages the list.
 - With Auctionator, TradeSkillMaster or Auctioneer installed, greys that sell well on the auction house are not the ones offered.
+
+## Disenchant
+
+With Enchanting learned, a counter shows the soulbound green, blue and purple weapons and armor you can disenchant. Hover it to see what a click would do.
+
+- **Click** disenchants gear you can never wear: another class's item, or an armor or weapon type your class never learns.
+- **Shift-click** disenchants gear you could wear, now or after leveling or training. The modifier keeps it from happening by accident.
+- **Upgrades are never offered**: Pawn's upgrade arrow when Pawn is installed, otherwise item level against what you wear.
+- Bind-on-equip, account-bound and "Cannot be disenchanted" items are never offered. Right-click to always keep an item.
+- When your bags are nearly full, only disenchants whose every possible material stacks with yours (or fits in an enchanting bag) are offered, so each one frees a slot.
 
 ## Setup
 
@@ -60,7 +73,7 @@ The counters only show in gamepad mode by default. The Settings page is built so
 /tally unlock    move the counters outside Edit Mode
 /tally lock      lock them again
 /tally reset     back to the bottom-right corner
-/tally keep      list, add or remove items never offered for deletion
+/tally keep      list, add or remove items never offered for deletion or disenchanting
 ```
 
 ## Notes
