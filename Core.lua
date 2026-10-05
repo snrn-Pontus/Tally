@@ -573,6 +573,8 @@ local scanTooltip
 -- "Requires Level %d" as a pattern, to tell a level requirement apart from
 -- the other red lines.
 local LEVEL_PATTERN = "^" .. (ITEM_MIN_LEVEL or "Requires Level %d"):gsub("%%d", "%%d+") .. "$"
+-- A broken item's durability line is red too, but it can be repaired.
+local DURABILITY_PATTERN = "^" .. (DURABILITY_TEMPLATE or "Durability %d / %d"):gsub("%%d", "%%d+") .. "$"
 
 -- Whether you can wear an item: "now", "later" (only its level is too high)
 -- or "never" (red text for armor type, weapon skill, class or race, which
@@ -591,7 +593,7 @@ local function WearState(bag, slot)
             local text = line and line:IsShown() and line:GetText()
             if text then
                 local r, g, b = line:GetTextColor()
-                if r > 0.99 and g < 0.2 and b < 0.2 then
+                if r > 0.99 and g < 0.2 and b < 0.2 and not text:match(DURABILITY_PATTERN) then
                     if not text:match(LEVEL_PATTERN) then
                         scanTooltip:Hide()
                         return "never"
