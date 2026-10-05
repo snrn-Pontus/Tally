@@ -445,27 +445,30 @@ local ITEM_CLASS_ARMOR = Enum and Enum.ItemClass and Enum.ItemClass.Armor or 4
 local ITEM_QUALITY_UNCOMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Uncommon or 2
 local ITEM_QUALITY_EPIC = Enum and Enum.ItemQuality and Enum.ItemQuality.Epic or 4
 
--- What Classic gear disenchants into, by item level band. Items past the
--- table have no known result, so they never count as freeing a slot.
+-- What Classic gear disenchants into, by item level band, with the most
+-- dust a green item in the band can give. Items past the table have no
+-- known result, so they never count as freeing a slot.
 local DISENCHANT_BANDS = {
-    { maxLevel = 15, dust = 10940, essence = 10938, shard = 10978 },
-    { maxLevel = 20, dust = 10940, essence = 10939, shard = 10978 },
-    { maxLevel = 25, dust = 10940, essence = 10998, shard = 10978 },
-    { maxLevel = 30, dust = 11083, essence = 11082, shard = 11084 },
-    { maxLevel = 35, dust = 11083, essence = 11134, shard = 11138 },
-    { maxLevel = 40, dust = 11137, essence = 11135, shard = 11139 },
-    { maxLevel = 45, dust = 11137, essence = 11174, shard = 11177 },
-    { maxLevel = 50, dust = 11176, essence = 11175, shard = 11178 },
-    { maxLevel = 55, dust = 11176, essence = 16202, shard = 14343 },
-    { maxLevel = 65, dust = 16204, essence = 16203, shard = 14344, crystal = 20725 },
+    { maxLevel = 15, dust = 10940, dustMax = 2, essence = 10938, shard = 10978 },
+    { maxLevel = 20, dust = 10940, dustMax = 3, essence = 10939, shard = 10978 },
+    { maxLevel = 25, dust = 10940, dustMax = 6, essence = 10998, shard = 10978 },
+    { maxLevel = 30, dust = 11083, dustMax = 2, essence = 11082, shard = 11084 },
+    { maxLevel = 35, dust = 11083, dustMax = 5, essence = 11134, shard = 11138 },
+    { maxLevel = 40, dust = 11137, dustMax = 2, essence = 11135, shard = 11139 },
+    { maxLevel = 45, dust = 11137, dustMax = 5, essence = 11174, shard = 11177 },
+    { maxLevel = 50, dust = 11176, dustMax = 2, essence = 11175, shard = 11178 },
+    { maxLevel = 55, dust = 11176, dustMax = 5, essence = 16202, shard = 14343 },
+    -- 56-60 gives at most 2 Illusion Dust and 61-65 at most 5: 5 covers both.
+    { maxLevel = 65, dust = 16204, dustMax = 5, essence = 16203, shard = 14344, crystal = 20725 },
     -- Classic endgame epics up to level 88 still give Nexus Crystals.
     -- Green and blue gear this high is not Classic, so it stays unknown.
     { maxLevel = 99, crystal = 20725 },
 }
 
--- The most one disenchant gives of each kind, and its stack size for when
--- the client has not cached the material yet.
-local MATERIAL_YIELD = { dust = 6, essence = 2, shard = 1, epicShard = 5, crystal = 2 }
+-- The most one disenchant gives of each kind (dust and crystals depend on
+-- the item, see PossibleMaterials), and its stack size for when the client
+-- has not cached the material yet.
+local MATERIAL_YIELD = { essence = 2, shard = 1, epicShard = 5 }
 local MATERIAL_STACK = { dust = 20, essence = 10, shard = 20, epicShard = 20, crystal = 20 }
 
 function Tally.KnowsDisenchant()
@@ -539,10 +542,11 @@ local function GetMaxStack(itemID, kind)
     return getter and (select(8, getter(itemID))) or MATERIAL_STACK[kind]
 end
 
--- Every material a disenchant can give, as { itemID, kind } pairs with the
+-- Every material a disenchant can give, as { itemID, kind, most } with the
 -- likely one first, or nil when the item level is past the table. Green
--- gear rolls dust, essence or a shard; blue gear a shard, or rarely a Nexus
--- Crystal from level 56; purple gear a Nexus Crystal from level 56.
+-- gear rolls dust, essence or a shard; blue gear a shard, or rarely one
+-- Nexus Crystal from level 56; purple gear Nexus Crystals from level 56,
+-- one up to level 60 and up to two past it.
 local function PossibleMaterials(classID, quality, level)
     if not level then
         return nil
@@ -554,21 +558,23 @@ local function PossibleMaterials(classID, quality, level)
             end
             if quality == ITEM_QUALITY_EPIC then
                 if band.crystal then
-                    return { { band.crystal, "crystal" } }
+                    return { { band.crystal, "crystal", level <= 60 and 1 or 2 } }
                 end
-                return { { band.shard, "epicShard" } }
+                return { { band.shard, "epicShard", MATERIAL_YIELD.epicShard } }
             elseif quality > ITEM_QUALITY_UNCOMMON then
-                local materials = { { band.shard, "shard" } }
+                local materials = { { band.shard, "shard", MATERIAL_YIELD.shard } }
                 if band.crystal then
-                    materials[2] = { band.crystal, "crystal" }
+                    materials[2] = { band.crystal, "crystal", 1 }
                 end
                 return materials
             end
-            local dust, essence = { band.dust, "dust" }, { band.essence, "essence" }
+            local dust = { band.dust, "dust", band.dustMax }
+            local essence = { band.essence, "essence", MATERIAL_YIELD.essence }
+            local shard = { band.shard, "shard", MATERIAL_YIELD.shard }
             if classID == ITEM_CLASS_WEAPON then
-                return { essence, dust, { band.shard, "shard" } }
+                return { essence, dust, shard }
             end
-            return { dust, essence, { band.shard, "shard" } }
+            return { dust, essence, shard }
         end
     end
     return nil
@@ -958,10 +964,10 @@ local function FindDisenchants(bags)
         candidate.material = materials and materials[1][1]
         candidate.freesSlot = materials ~= nil
         for _, entry in ipairs(materials or {}) do
-            local material, kind = entry[1], entry[2]
+            local material, kind, most = entry[1], entry[2], entry[3]
             local stacks = held[material]
             local room = stacks and stacks.stacks * GetMaxStack(material, kind) - stacks.count or 0
-            if room < MATERIAL_YIELD[kind] then
+            if room < most then
                 candidate.freesSlot = false
             end
         end
