@@ -446,7 +446,8 @@ local ITEM_QUALITY_UNCOMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Unc
 local ITEM_QUALITY_EPIC = Enum and Enum.ItemQuality and Enum.ItemQuality.Epic or 4
 
 -- What Classic gear disenchants into, by item level band, with the most
--- dust a green item in the band can give. Items past the table have no
+-- dust (and, where it is not two, essence) a green item in the band can
+-- give. Items past the table have no
 -- known result, so they never count as freeing a slot.
 local DISENCHANT_BANDS = {
     { maxLevel = 15, dust = 10940, dustMax = 2, essence = 10938, shard = 10978 },
@@ -458,8 +459,9 @@ local DISENCHANT_BANDS = {
     { maxLevel = 45, dust = 11137, dustMax = 5, essence = 11174, shard = 11177 },
     { maxLevel = 50, dust = 11176, dustMax = 2, essence = 11175, shard = 11178 },
     { maxLevel = 55, dust = 11176, dustMax = 5, essence = 16202, shard = 14343 },
-    -- 56-60 gives at most 2 Illusion Dust and 61-65 at most 5: 5 covers both.
-    { maxLevel = 65, dust = 16204, dustMax = 5, essence = 16203, shard = 14344, crystal = 20725 },
+    -- 56-60 gives at most 2 Illusion Dust and 61-65 at most 5, and 61-65 up
+    -- to 3 Greater Eternal Essence: the higher figures cover both.
+    { maxLevel = 65, dust = 16204, dustMax = 5, essence = 16203, essenceMax = 3, shard = 14344, crystal = 20725 },
     -- Classic endgame epics up to level 88 still give Nexus Crystals.
     -- Green and blue gear this high is not Classic, so it stays unknown.
     { maxLevel = 99, crystal = 20725 },
@@ -468,7 +470,7 @@ local DISENCHANT_BANDS = {
 -- The most one disenchant gives of each kind (dust and crystals depend on
 -- the item, see PossibleMaterials), and its stack size for when the client
 -- has not cached the material yet.
-local MATERIAL_YIELD = { essence = 2, shard = 1, epicShard = 5 }
+local MATERIAL_YIELD = { essence = 2, shard = 1, epicShard = 4 }
 local MATERIAL_STACK = { dust = 20, essence = 10, shard = 20, epicShard = 20, crystal = 20 }
 
 function Tally.KnowsDisenchant()
@@ -569,7 +571,7 @@ local function PossibleMaterials(classID, quality, level)
                 return materials
             end
             local dust = { band.dust, "dust", band.dustMax }
-            local essence = { band.essence, "essence", MATERIAL_YIELD.essence }
+            local essence = { band.essence, "essence", band.essenceMax or MATERIAL_YIELD.essence }
             local shard = { band.shard, "shard", MATERIAL_YIELD.shard }
             if classID == ITEM_CLASS_WEAPON then
                 return { essence, dust, shard }
