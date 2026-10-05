@@ -27,6 +27,25 @@ local BAG_FORMATS = {
     { value = "usedTotal", label = "Used / total (57/80)" },
 }
 
+local REAGENT_BAGS = {
+    { value = "combined", label = "With your bags" },
+    { value = "separate", label = "Own counter per bag" },
+}
+
+local JUNK_PRICES = {
+    { value = "auction", label = "Auction price when known" },
+    { value = "vendor", label = "Vendor price" },
+}
+
+local WHITE_WORTH = {
+    { value = 0, label = "Off" },
+    { value = 100, label = "1 silver" },
+    { value = 1000, label = "10 silver" },
+    { value = 5000, label = "50 silver" },
+    { value = 10000, label = "1 gold" },
+    { value = 50000, label = "5 gold" },
+}
+
 local LAYOUTS = {
     { value = "row", label = "Side by side" },
     { value = "column", label = "Stacked" },
@@ -75,9 +94,9 @@ local function OptionLabel(options, value)
     return tostring(value)
 end
 
-local function CreateCheckbox(parent, key, labelText, tooltip, y)
+local function CreateCheckbox(parent, key, labelText, tooltip, y, indent)
     local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    check:SetPoint("TOPLEFT", 4, y)
+    check:SetPoint("TOPLEFT", 4 + (indent or 0), y)
     check:SetSize(26, 26)
     check.label = check:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     check.label:SetPoint("LEFT", check, "RIGHT", 4, 0)
@@ -181,7 +200,7 @@ function ns.settings.Register()
     note:SetPoint("TOPLEFT", 6, y)
     note:SetWidth(540)
     note:SetJustifyH("LEFT")
-    note:SetText("Free bag slots and ammo in the bottom-right corner, for the gamepad HUD that shows neither. Hover a counter for the details per bag and per ammo type. With a controller, use the mouse on this page: the gamepad cursor cannot enter it without freezing Forever when Settings is closed.")
+    note:SetText("Free bag slots and ammo in the bottom-right corner, for the gamepad HUD that shows neither. Hover a counter for the details per bag and per ammo type; click the bag counter to delete your cheapest grey item. With a controller, use the mouse on this page: the gamepad cursor cannot enter it without freezing Forever when Settings is closed.")
     y = y - (note:GetStringHeight() + 12)
 
     local status = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -194,7 +213,29 @@ function ns.settings.Register()
     y = CreateHeader(content, "Counters", y)
     y = CreateCheckbox(content, "showBags", "Show free bag slots", "Counts slots in bags that hold anything. Quivers, ammo pouches, soul bags and profession bags are listed in the tooltip but not counted.", y)
     y = CreateCycleButton(content, "bagFormat", BAG_FORMATS, "Bag slots as:", nil, y)
+    y = CreateCycleButton(content, "reagentBags", REAGENT_BAGS, "Reagent bags:", "With your bags counts a reagent bag's free slots in the bag counter. Own counter per bag leaves them out of it and gives each reagent bag a counter of its own, with the bag's icon.", y)
     y = CreateCycleButton(content, "bagWarning", BAG_WARNINGS, "Yellow at free slots:", "The count turns yellow at this many free slots or fewer, and red when your bags are full.", y)
+    y = CreateCheckbox(content, "clickToDelete", "Click the bag counter to delete greys", "The bag tooltip names your grey item with the lowest vendor value. Click once and the tooltip asks to delete it; click again to delete it. Moving away cancels.", y)
+    y = CreateCheckbox(content, "deleteWhites", "Include white items", "White items can be offered too when they are worth the least. Ammo, quest items, keys and anything a vendor will not buy (such as your Hearthstone) are never offered.", y)
+    y = CreateCheckbox(content, "keepTradeGoods", "Keep trade goods", "Never offer white cloth, herbs, ore, leather and other crafting materials.", y, 24)
+    y = CreateCheckbox(content, "keepConsumables", "Keep consumables", "Never offer white food, drink, potions and bandages.", y, 24)
+    y = CreateCheckbox(content, "keepReagents", "Keep reagents", "Never offer white reagents, such as class reagents for spells.", y, 24)
+    y = CreateCheckbox(content, "keepRecipes", "Keep recipes", "Never offer white recipes.", y, 24)
+    y = CreateCycleButton(content, "keepWhitesWorth", WHITE_WORTH, "Keep whites worth:", "Never offer a white stack worth this much or more, counting the auction price when it is known. Greys are not affected.", y)
+
+    local forget = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    forget:SetPoint("TOPLEFT", 190, y - 2)
+    forget:SetSize(230, 22)
+    forget:SetScript("OnClick", Tally.ClearKept)
+    AttachTooltip(forget, "Always kept items", "Right-click the bag counter to always keep the item it offers. /tally keep lists them; this button forgets them all.")
+    forget.Refresh = function()
+        local count = Tally.GetKeptCount()
+        forget:SetText(string.format("Forget %d kept %s", count, count == 1 and "item" or "items"))
+        forget:SetEnabled(count > 0)
+    end
+    controls[#controls + 1] = forget
+    y = y - 32
+    y = CreateCycleButton(content, "junkPrice", JUNK_PRICES, "Value greys by:", "With Auctionator, TradeSkillMaster or Auctioneer installed, a grey is worth the higher of its vendor and auction price, so a grey that sells well on the auction house is not the one offered for deletion. Without one of them, vendor price is used.", y)
     y = CreateCycleButton(content, "showAmmo", AMMO_MODES, "Show ammo:", "By default the ammo counter appears when you have a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped.", y)
     y = CreateCycleButton(content, "ammoWarning", AMMO_WARNINGS, "Yellow at ammo:", "The count turns yellow at this much ammo or less, and red when you are out.", y)
     y = y - 6
