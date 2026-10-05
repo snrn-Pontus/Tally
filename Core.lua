@@ -395,6 +395,12 @@ function Tally.DeleteJunk(target)
         Print("that item moved, nothing deleted.")
         return false
     end
+    -- It may have been kept, become a quest item or fallen outside the
+    -- settings since the first click.
+    if not IsJunkCandidate(itemID, quality, target.bag, target.slot) then
+        Print("%s is no longer offered, nothing deleted.", target.link)
+        return false
+    end
     PickupBagSlot(target.bag, target.slot)
     local kind, cursorItemID = GetCursorInfo()
     if kind ~= "item" or cursorItemID ~= target.itemID then
