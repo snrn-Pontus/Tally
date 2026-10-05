@@ -227,7 +227,7 @@ function ns.settings.Register()
     forget:SetPoint("TOPLEFT", 190, y - 2)
     forget:SetSize(230, 22)
     forget:SetScript("OnClick", Tally.ClearKept)
-    AttachTooltip(forget, "Always kept items", "Right-click the bag counter to always keep the item it offers. /tally keep lists them; this button forgets them all.")
+    AttachTooltip(forget, "Always kept items", "Right-click the bag or disenchant counter to always keep the item it offers. /tally keep lists them; this button forgets them all.")
     forget.Refresh = function()
         local count = Tally.GetKeptCount()
         forget:SetText(string.format("Forget %d kept %s", count, count == 1 and "item" or "items"))
@@ -236,6 +236,8 @@ function ns.settings.Register()
     controls[#controls + 1] = forget
     y = y - 32
     y = CreateCycleButton(content, "junkPrice", JUNK_PRICES, "Value greys by:", "With Auctionator, TradeSkillMaster or Auctioneer installed, a grey is worth the higher of its vendor and auction price, so a grey that sells well on the auction house is not the one offered for deletion. Without one of them, vendor price is used.", y)
+    y = CreateCheckbox(content, "showDisenchant", "Show disenchant counter", "With Enchanting learned, a counter shows how many soulbound green, blue and purple weapons and armor you can disenchant. Click it to disenchant gear you can never wear (wrong armor type, weapon skill or class); shift-click for gear you could wear, now or at a higher level. Right-click always keeps the item. With free slots at or below the yellow warning, only items whose likely material stacks with what you carry are offered, so each disenchant frees a slot. Out of combat only.", y)
+    y = CreateCheckbox(content, "keepUpgrades", "Never disenchant upgrades", "Items better than what you wear in their slot are never offered, and the tooltip lists them. With Pawn installed its upgrade arrow decides; otherwise a higher item level than the weakest item in the slot, or an empty slot, counts as better. Items you cannot wear (wrong armor type, class or level) are not upgrades.", y, 24)
     y = CreateCycleButton(content, "showAmmo", AMMO_MODES, "Show ammo:", "By default the ammo counter appears when you have a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped.", y)
     y = CreateCycleButton(content, "ammoWarning", AMMO_WARNINGS, "Yellow at ammo:", "The count turns yellow at this much ammo or less, and red when you are out.", y)
     y = y - 6

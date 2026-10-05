@@ -17,6 +17,7 @@ local DEFAULT_POSITION = { point = "BOTTOMRIGHT", relativePoint = "BOTTOMRIGHT",
 
 local BAG_ICON = "Interface\\Icons\\INV_Misc_Bag_08"
 local AMMO_ICON = "Interface\\Icons\\INV_Ammo_Arrow_02"
+local DISENCHANT_ICON = "Interface\\Icons\\INV_Enchant_Disenchant"
 
 local COLOR_NORMAL = { 1, 1, 1 }
 local COLOR_WARNING = { 1, 0.82, 0 }
@@ -35,6 +36,7 @@ local container
 local readouts = { reagents = {} }
 local editModeActive = false
 local pendingDelete    -- the grey stack the first bag click offered to delete
+local disenchantButton  -- secure, laid over the disenchant counter out of combat
 
 local function AtlasExists(name)
     if not name or not C_Texture or type(C_Texture.GetAtlasInfo) ~= "function" then
@@ -169,6 +171,74 @@ local function ShowBagTooltip(owner)
     GameTooltip:Show()
 end
 
+local function DisenchantResult(target)
+    if not target.material then
+        return "Result unknown for this item level.", 0.62, 0.62, 0.62
+    end
+    local material = IconText(Tally.GetItemIcon(target.material), Tally.GetItemName(target.material))
+    if target.freesSlot then
+        return "Frees a slot: likely " .. material .. ", which stacks with yours.", 0.25, 1, 0.25
+    end
+    return "Likely " .. material .. ", which needs a slot of its own.", 0.62, 0.62, 0.62
+end
+
+local function AddDisenchantTarget(target)
+    local value = target.value > 0 and FormatMoney(target.value) or ""
+    GameTooltip:AddDoubleLine(IconText(Tally.GetItemIcon(target.itemID), target.link), value, 1, 1, 1, 1, 1, 1)
+    local text, r, g, b = DisenchantResult(target)
+    GameTooltip:AddLine(text, r, g, b, true)
+end
+
+local function ShowDisenchantTooltip(owner)
+    local disenchant = Tally.disenchant
+    local count = disenchant.count
+    local items = count == 1 and "item" or "items"
+    GameTooltip:SetOwner(owner, "ANCHOR_TOPLEFT")
+    GameTooltip:SetText(IconText(Tally.GetDisenchantIcon() or DISENCHANT_ICON, "Disenchant"), 1, 1, 1)
+    if disenchant.tight then
+        GameTooltip:AddLine(string.format("%d soulbound %s that free a bag slot", count, items), nil, nil, nil, true)
+    else
+        GameTooltip:AddLine(string.format("%d soulbound %s you can disenchant", count, items), nil, nil, nil, true)
+    end
+    if disenchant.safeCount > 0 and disenchant.safeCount < count then
+        GameTooltip:AddLine(string.format("%d of them you can never wear", disenchant.safeCount), nil, nil, nil, true)
+    end
+    GameTooltip:AddLine(" ")
+    if InCombatLockdown() then
+        GameTooltip:AddLine("Disenchanting waits until you leave combat.", 0.62, 0.62, 0.62, true)
+    else
+        if disenchant.safeTarget then
+            GameTooltip:AddLine("Click: gear you can never wear", 0.62, 0.62, 0.62)
+            AddDisenchantTarget(disenchant.safeTarget)
+        end
+        if disenchant.unsafeTarget then
+            if disenchant.safeTarget then
+                GameTooltip:AddLine(" ")
+            end
+            GameTooltip:AddLine("Shift-click: gear you could wear", 1, 0.82, 0)
+            AddDisenchantTarget(disenchant.unsafeTarget)
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Right-click (or shift-right-click) to always keep the item instead.", 0.62, 0.62, 0.62, true)
+    end
+    if disenchant.tight then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Your bags are nearly full, so only items whose materials stack with yours are offered.", 0.62, 0.62, 0.62, true)
+    end
+    if disenchant.upgrades and #disenchant.upgrades > 0 then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Never offered, better than what you wear:", 0.62, 0.62, 0.62)
+        for _, upgrade in ipairs(disenchant.upgrades) do
+            GameTooltip:AddDoubleLine(IconText(Tally.GetItemIcon(upgrade.itemID), upgrade.link), upgrade.reason, 1, 1, 1, 0.62, 0.62, 0.62)
+        end
+    end
+    local kept = Tally.GetKeptCount()
+    if kept > 0 then
+        GameTooltip:AddLine(string.format("%d %s always kept (/tally keep).", kept, kept == 1 and "item" or "items"), 0.62, 0.62, 0.62)
+    end
+    GameTooltip:Show()
+end
+
 local function ShowReagentTooltip(owner)
     local entry = owner.entry
     if not entry then
@@ -239,6 +309,100 @@ local function OnBagClick(readout, mouseButton)
         pendingDelete = Tally.FindCheapestJunk()
     end
     ShowBagTooltip(readout)
+end
+
+-- Casting needs a secure button, so the disenchant counter gets one laid
+-- over it. A plain click disenchants soulbound gear you can never wear,
+-- which is safe to do at once. Gear you could wear takes a shift-click, so
+-- it is never disenchanted by accident. PreClick checks the item again and
+-- sets "/cast Disenchant" and "/use bag slot" for the secure handler to
+-- run; PostClick clears it.
+local function OnDisenchantPreClick(self, mouseButton)
+    if InCombatLockdown() then
+        return
+    end
+    self:SetAttribute("type", nil)
+    self:SetAttribute("macrotext", nil)
+    if IsEditable() then
+        return
+    end
+    local disenchant = Tally.disenchant
+    local shift = IsShiftKeyDown()
+    local target
+    if shift then
+        target = disenchant.unsafeTarget or disenchant.safeTarget
+    else
+        target = disenchant.safeTarget
+    end
+    if mouseButton == "RightButton" then
+        if target then
+            Tally.SetKept(target.itemID, true)
+            Tally.Print("always keeping %s. /tally keep lists kept items.", target.link)
+        end
+    elseif mouseButton == "LeftButton" then
+        if not target then
+            if disenchant.unsafeTarget then
+                Tally.Print("everything left is gear you could wear: shift-click to disenchant %s.", disenchant.unsafeTarget.link)
+            end
+            return
+        end
+        local macro = Tally.PrepareDisenchant(target, not shift)
+        if macro then
+            self:SetAttribute("type", "macro")
+            self:SetAttribute("macrotext", macro)
+        end
+    end
+end
+
+local function OnDisenchantPostClick(self)
+    if not InCombatLockdown() then
+        self:SetAttribute("type", nil)
+        self:SetAttribute("macrotext", nil)
+    end
+    ShowDisenchantTooltip(self)
+end
+
+local function CreateDisenchantButton()
+    local button = CreateFrame("Button", "TallyDisenchantButton", UIParent, "SecureActionButtonTemplate")
+    button:Hide()
+    button:SetFrameStrata(container:GetFrameStrata())
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- Act on the release like the other counters, whatever the key-down CVar.
+    button:SetAttribute("useOnKeyDown", false)
+    button:SetScript("PreClick", OnDisenchantPreClick)
+    button:SetScript("PostClick", OnDisenchantPostClick)
+    button:SetScript("OnEnter", ShowDisenchantTooltip)
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    return button
+end
+
+-- Lays the secure button over the counter while it is visible, out of
+-- combat and outside Edit Mode. As combat starts (PLAYER_REGEN_DISABLED
+-- comes just before the lockdown) it is hidden and unanchored, so the
+-- counters stay free to move and resize in combat. It is only created out
+-- of combat, since a protected frame cannot be hidden during it.
+function ns.display.UpdateDisenchantButton(enteringCombat)
+    if not container or InCombatLockdown() then
+        return
+    end
+    disenchantButton = disenchantButton or CreateDisenchantButton()
+    local readout = readouts.disenchant
+    disenchantButton:SetAttribute("type", nil)
+    disenchantButton:SetAttribute("macrotext", nil)
+    if enteringCombat or IsEditable() or not readout:IsVisible() then
+        disenchantButton:Hide()
+        disenchantButton:ClearAllPoints()
+        if GameTooltip:IsOwned(disenchantButton) then
+            GameTooltip:Hide()
+        end
+        return
+    end
+    disenchantButton:ClearAllPoints()
+    disenchantButton:SetAllPoints(readout)
+    disenchantButton:SetFrameLevel(container:GetFrameLevel() + 10)
+    disenchantButton:Show()
 end
 
 local function CreateReadout(key, onEnter, onClick)
@@ -346,6 +510,7 @@ local function Layout()
     for _, readout in ipairs(readouts.reagents) do
         order[#order + 1] = readout
     end
+    order[#order + 1] = readouts.disenchant
     order[#order + 1] = readouts.ammo
     local visible = {}
     for _, readout in ipairs(order) do
@@ -398,10 +563,15 @@ function ns.display.Refresh()
         end
     end
 
+    local disenchant = Tally.disenchant
+    readouts.disenchant:SetShown(TallyDB.showDisenchant and disenchant.known and disenchant.count > 0)
+    SetReadout(readouts.disenchant, Tally.GetDisenchantIcon() or DISENCHANT_ICON, tostring(disenchant.count), COLOR_NORMAL)
+
     readouts.ammo:SetShown(ammo.shown)
     SetReadout(readouts.ammo, ammo.icon or AMMO_ICON, FormatNumber(ammo.count), CountColor(ammo.count, TallyDB.ammoWarning))
 
     Layout()
+    ns.display.UpdateDisenchantButton()
 
     -- Keep an open bag tooltip current, e.g. after a delete.
     if GameTooltip:IsShown() and GameTooltip:IsOwned(readouts.bags) then
@@ -410,6 +580,13 @@ function ns.display.Refresh()
     for _, readout in ipairs(readouts.reagents) do
         if readout.entry and GameTooltip:IsShown() and GameTooltip:IsOwned(readout) then
             ShowReagentTooltip(readout)
+        end
+    end
+    if GameTooltip:IsShown() then
+        if disenchantButton and disenchantButton:IsShown() and GameTooltip:IsOwned(disenchantButton) then
+            ShowDisenchantTooltip(disenchantButton)
+        elseif GameTooltip:IsOwned(readouts.disenchant) then
+            ShowDisenchantTooltip(readouts.disenchant)
         end
     end
 end
@@ -445,6 +622,7 @@ function ns.display.UpdateVisibility()
     local editable = IsEditable()
     container.editOverlay:SetShown(editable)
     container:SetShown(not TallyDB.gamepadOnly or IsGamepadInterfaceActive() or editable)
+    ns.display.UpdateDisenchantButton()
 end
 
 function ns.display.ApplyAppearance()
@@ -537,6 +715,8 @@ function ns.display.Create()
     container:SetSize(ICON_SIZE, ICON_SIZE)
 
     CreateReadout("bags", ShowBagTooltip, OnBagClick)
+    -- Hover-only itself: out of combat the secure button covers it.
+    CreateReadout("disenchant", ShowDisenchantTooltip)
     CreateReadout("ammo", ShowAmmoTooltip)
     container.editOverlay = CreateEditOverlay()
 

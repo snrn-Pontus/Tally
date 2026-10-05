@@ -15,6 +15,7 @@ local updateScheduled = false
 -- Latest counts, filled by Recount. Display.lua and the tooltips read these.
 Tally.bags = { free = 0, total = 0, list = {}, reagents = {} }
 Tally.ammo = { shown = false, count = 0, list = {} }
+Tally.disenchant = { known = false, count = 0 }
 
 local function Print(fmt, ...)
     local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
@@ -52,6 +53,8 @@ local DEFAULTS = {
     keepWhitesWorth = 0,      -- with whites on: never offer white stacks worth this much (copper; 0 = off)
     junkPrice = "auction",    -- "vendor" | "auction" (higher of vendor and auction addon price)
     reagentBags = "combined", -- "combined" | "separate" (each reagent bag gets its own counter)
+    showDisenchant = true,    -- disenchant counter, when you know Disenchant
+    keepUpgrades = true,      -- never offer gear better than what you wear
     unlocked = false,
     position = nil,           -- { point, relativePoint, x, y }; nil = default corner
 }
@@ -433,6 +436,342 @@ function Tally.GetKeptCount()
 end
 
 --------------------------------------------------------------------------------
+-- Disenchanting
+--------------------------------------------------------------------------------
+
+local DISENCHANT_SPELL = 13262
+local ITEM_CLASS_ARMOR = Enum and Enum.ItemClass and Enum.ItemClass.Armor or 4
+local ITEM_QUALITY_UNCOMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Uncommon or 2
+local ITEM_QUALITY_EPIC = Enum and Enum.ItemQuality and Enum.ItemQuality.Epic or 4
+
+-- What Classic gear disenchants into, by item level: uncommon armor mostly
+-- gives the dust, uncommon weapons the essence, rare items the shard and
+-- epics the shard or, past level 60, the Nexus Crystal. Items past the
+-- table have no known result, so they never count as freeing a slot.
+local DISENCHANT_BANDS = {
+    { maxLevel = 15, dust = 10940, essence = 10938, shard = 10978 },
+    { maxLevel = 20, dust = 10940, essence = 10939, shard = 10978 },
+    { maxLevel = 25, dust = 10940, essence = 10998, shard = 10978 },
+    { maxLevel = 30, dust = 11083, essence = 11082, shard = 11084 },
+    { maxLevel = 35, dust = 11083, essence = 11134, shard = 11138 },
+    { maxLevel = 40, dust = 11137, essence = 11135, shard = 11139 },
+    { maxLevel = 45, dust = 11137, essence = 11174, shard = 11177 },
+    { maxLevel = 50, dust = 11176, essence = 11175, shard = 11178 },
+    { maxLevel = 55, dust = 11176, essence = 16202, shard = 14343 },
+    { maxLevel = 65, dust = 16204, essence = 16203, shard = 14344, crystal = 20725 },
+}
+
+-- The most one disenchant gives of each kind, and its stack size for when
+-- the client has not cached the material yet.
+local MATERIAL_YIELD = { dust = 5, essence = 2, shard = 1, epicShard = 5, crystal = 2 }
+local MATERIAL_STACK = { dust = 20, essence = 10, shard = 20, epicShard = 20, crystal = 20 }
+
+function Tally.KnowsDisenchant()
+    if IsPlayerSpell then
+        return IsPlayerSpell(DISENCHANT_SPELL) == true
+    end
+    return IsSpellKnown ~= nil and IsSpellKnown(DISENCHANT_SPELL) == true
+end
+
+-- The localized spell name, for the /cast line of the disenchant button.
+function Tally.GetDisenchantSpellName()
+    if C_Spell and C_Spell.GetSpellName then
+        return C_Spell.GetSpellName(DISENCHANT_SPELL)
+    end
+    return GetSpellInfo and (GetSpellInfo(DISENCHANT_SPELL)) or nil
+end
+
+function Tally.GetDisenchantIcon()
+    if C_Spell and C_Spell.GetSpellTexture then
+        return C_Spell.GetSpellTexture(DISENCHANT_SPELL)
+    end
+    return GetSpellTexture and GetSpellTexture(DISENCHANT_SPELL) or nil
+end
+
+local function IsSoulbound(bag, slot)
+    if C_Item and C_Item.IsBound and ItemLocation and ItemLocation.CreateFromBagAndSlot then
+        local ok, bound = pcall(C_Item.IsBound, ItemLocation:CreateFromBagAndSlot(bag, slot))
+        if ok then
+            return bound == true
+        end
+    end
+    if C_Container and C_Container.GetContainerItemInfo then
+        local info = C_Container.GetContainerItemInfo(bag, slot)
+        return info ~= nil and info.isBound == true
+    end
+    return false
+end
+
+local function GetItemLevel(itemID, link)
+    local getter = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    return getter and (select(4, getter(link or itemID))) or nil
+end
+
+local function GetMaxStack(itemID, kind)
+    local getter = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    return getter and (select(8, getter(itemID))) or MATERIAL_STACK[kind]
+end
+
+-- The material a disenchant most likely gives and its kind, or nil when the
+-- item level is past the table.
+local function LikelyMaterial(classID, quality, level)
+    if not level then
+        return nil
+    end
+    for _, band in ipairs(DISENCHANT_BANDS) do
+        if level <= band.maxLevel then
+            if quality == ITEM_QUALITY_EPIC then
+                if band.crystal and level > 60 then
+                    return band.crystal, "crystal"
+                end
+                return band.shard, "epicShard"
+            elseif quality > ITEM_QUALITY_UNCOMMON then
+                return band.shard, "shard"
+            elseif classID == ITEM_CLASS_WEAPON then
+                return band.essence, "essence"
+            end
+            return band.dust, "dust"
+        end
+    end
+    return nil
+end
+
+-- Soulbound green, blue and purple weapons and armor: they cannot go to the
+-- auction house, so disenchanting them loses only vendor money. Kept items
+-- and quest items are never offered.
+local function IsDisenchantCandidate(itemID, quality, bag, slot)
+    if TallyDB.keep[itemID] or not quality then
+        return false
+    end
+    if quality < ITEM_QUALITY_UNCOMMON or quality > ITEM_QUALITY_EPIC then
+        return false
+    end
+    local classID = GetItemClass(itemID)
+    if classID ~= ITEM_CLASS_WEAPON and classID ~= ITEM_CLASS_ARMOR then
+        return false
+    end
+    return IsSoulbound(bag, slot) and not IsQuestItem(bag, slot)
+end
+
+-- Where each kind of gear goes. One-handers also count the off hand, but
+-- only when a weapon is in it, so a shield is not compared with a sword.
+local EQUIP_SLOTS = {
+    INVTYPE_HEAD = { 1 }, INVTYPE_NECK = { 2 }, INVTYPE_SHOULDER = { 3 },
+    INVTYPE_BODY = { 4 }, INVTYPE_CHEST = { 5 }, INVTYPE_ROBE = { 5 },
+    INVTYPE_WAIST = { 6 }, INVTYPE_LEGS = { 7 }, INVTYPE_FEET = { 8 },
+    INVTYPE_WRIST = { 9 }, INVTYPE_HAND = { 10 }, INVTYPE_FINGER = { 11, 12 },
+    INVTYPE_TRINKET = { 13, 14 }, INVTYPE_CLOAK = { 15 }, INVTYPE_WEAPON = { 16, 17 },
+    INVTYPE_2HWEAPON = { 16 }, INVTYPE_WEAPONMAINHAND = { 16 }, INVTYPE_SHIELD = { 17 },
+    INVTYPE_WEAPONOFFHAND = { 17 }, INVTYPE_HOLDABLE = { 17 }, INVTYPE_RANGED = { 18 },
+    INVTYPE_RANGEDRIGHT = { 18 }, INVTYPE_THROWN = { 18 }, INVTYPE_RELIC = { 18 },
+    INVTYPE_TABARD = { 19 },
+}
+local OFF_HAND_SLOT = 17
+
+local scanTooltip
+
+-- "Requires Level %d" as a pattern, to tell a level requirement apart from
+-- the other red lines.
+local LEVEL_PATTERN = "^" .. (ITEM_MIN_LEVEL or "Requires Level %d"):gsub("%%d", "%%d+") .. "$"
+
+-- Whether you can wear an item: "now", "later" (only its level is too high)
+-- or "never" (red text for armor type, weapon skill, class or race, which
+-- leveling does not fix).
+local function WearState(bag, slot)
+    if not scanTooltip then
+        scanTooltip = CreateFrame("GameTooltip", "TallyScanTooltip", nil, "GameTooltipTemplate")
+    end
+    scanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scanTooltip:ClearLines()
+    scanTooltip:SetBagItem(bag, slot)
+    local state = "now"
+    for i = 2, scanTooltip:NumLines() do
+        for _, side in ipairs({ "Left", "Right" }) do
+            local line = _G["TallyScanTooltipText" .. side .. i]
+            local text = line and line:IsShown() and line:GetText()
+            if text then
+                local r, g, b = line:GetTextColor()
+                if r > 0.99 and g < 0.2 and b < 0.2 then
+                    if not text:match(LEVEL_PATTERN) then
+                        scanTooltip:Hide()
+                        return "never"
+                    end
+                    state = "later"
+                end
+            end
+        end
+    end
+    scanTooltip:Hide()
+    return state
+end
+
+-- Pawn's upgrade arrow, when Pawn is installed: true or false, or nil when
+-- Pawn has no opinion.
+local function PawnSaysUpgrade(link)
+    if type(PawnShouldItemLinkHaveUpgradeArrow) ~= "function" then
+        return nil
+    end
+    local ok, upgrade = pcall(PawnShouldItemLinkHaveUpgradeArrow, link)
+    if ok and upgrade ~= nil then
+        return upgrade and true or false
+    end
+    return nil
+end
+
+-- Whether an item you can wear now would be better than what you wear:
+-- Pawn's verdict if Pawn is installed, otherwise a higher item level than
+-- the weakest item in its slots, or an empty slot.
+local function IsUpgrade(itemID, link, level, wear)
+    local getter = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    local equipLoc = getter and select(4, getter(itemID))
+    local slots = EQUIP_SLOTS[equipLoc]
+    if not slots or wear ~= "now" then
+        return false
+    end
+    local pawn = link and PawnSaysUpgrade(link)
+    if pawn ~= nil then
+        return pawn, "Pawn"
+    end
+    if not level then
+        return false
+    end
+    for _, inventorySlot in ipairs(slots) do
+        local equipped = GetInventoryItemLink("player", inventorySlot)
+        if inventorySlot == OFF_HAND_SLOT and equipLoc == "INVTYPE_WEAPON"
+            and (not equipped or GetItemClass(GetInventoryItemID("player", inventorySlot)) ~= ITEM_CLASS_WEAPON) then
+            -- A shield, off-hand item or nothing there: not compared.
+        elseif not equipped then
+            return true, "empty slot"
+        else
+            local equippedLevel = GetItemLevel(nil, equipped)
+            if equippedLevel and level > equippedLevel then
+                return true, "item level"
+            end
+        end
+    end
+    return false
+end
+
+-- Items that free a slot first, then the one worth least at a vendor.
+local function IsBetterTarget(candidate, best)
+    if not best then
+        return true
+    end
+    if candidate.freesSlot ~= best.freesSlot then
+        return candidate.freesSlot
+    end
+    return candidate.value < best.value
+end
+
+-- Every item you could disenchant, split into safe ones (soulbound gear you
+-- can never wear, only good for materials) and the rest, with the one of
+-- each to offer. Disenchanting frees the item's slot, but the materials take
+-- a new slot unless they stack with what you carry. With room to spare
+-- (more free slots than the yellow warning) every candidate counts; with
+-- bags getting full only items whose likely material has room for a full
+-- result in your stacks count. Upgrades over what you wear are held back
+-- and listed instead.
+local function FindDisenchants(bags)
+    local result = { known = Tally.KnowsDisenchant(), count = 0, safeCount = 0, upgrades = {} }
+    if not TallyDB or not result.known then
+        return result
+    end
+    result.tight = bags.free <= (TallyDB.bagWarning or 0)
+
+    local held = {}
+    local candidates = {}
+    for bag = 0, LastBagIndex() do
+        for slot = 1, GetNumSlots(bag) do
+            local itemID, count, quality, locked, link = GetBagSlotItem(bag, slot)
+            if itemID then
+                held[itemID] = held[itemID] or { count = 0, stacks = 0 }
+                held[itemID].count = held[itemID].count + count
+                held[itemID].stacks = held[itemID].stacks + 1
+                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot) then
+                    local wear = WearState(bag, slot)
+                    local candidate = {
+                        bag = bag,
+                        slot = slot,
+                        itemID = itemID,
+                        quality = quality,
+                        link = link or GetItemName(itemID),
+                        level = GetItemLevel(itemID, link),
+                        value = GetSellPrice(itemID) or 0,
+                        safe = wear == "never",
+                    }
+                    local upgrade, reason
+                    if TallyDB.keepUpgrades then
+                        upgrade, reason = IsUpgrade(itemID, link, candidate.level, wear)
+                    end
+                    if upgrade then
+                        candidate.reason = reason
+                        result.upgrades[#result.upgrades + 1] = candidate
+                    else
+                        candidates[#candidates + 1] = candidate
+                    end
+                end
+            end
+        end
+    end
+
+    for _, candidate in ipairs(candidates) do
+        local material, kind = LikelyMaterial(GetItemClass(candidate.itemID), candidate.quality, candidate.level)
+        candidate.material = material
+        candidate.freesSlot = false
+        if material and held[material] then
+            local stacks = held[material]
+            local room = stacks.stacks * GetMaxStack(material, kind) - stacks.count
+            candidate.freesSlot = room >= MATERIAL_YIELD[kind]
+        end
+        if candidate.freesSlot or not result.tight then
+            result.count = result.count + 1
+            if candidate.safe then
+                result.safeCount = result.safeCount + 1
+                if IsBetterTarget(candidate, result.safeTarget) then
+                    result.safeTarget = candidate
+                end
+            elseif IsBetterTarget(candidate, result.unsafeTarget) then
+                result.unsafeTarget = candidate
+            end
+        end
+    end
+    return result
+end
+
+-- Rechecks the offered item as it is clicked: still in its slot, still
+-- offered, not an upgrade and, for a plain click, still gear you can never
+-- wear. Returns the macro for the disenchant button, or nil.
+function Tally.PrepareDisenchant(target, requireSafe)
+    if GetCursorInfo() then
+        Print("put down what you are holding first.")
+        return nil
+    end
+    local itemID, _, quality, locked = GetBagSlotItem(target.bag, target.slot)
+    if itemID ~= target.itemID or locked then
+        Print("that item moved, nothing disenchanted.")
+        return nil
+    end
+    if not IsDisenchantCandidate(itemID, quality, target.bag, target.slot) then
+        Print("%s is no longer offered, nothing disenchanted.", target.link)
+        return nil
+    end
+    local wear = WearState(target.bag, target.slot)
+    if requireSafe and wear ~= "never" then
+        Print("%s is gear you can wear: shift-click to disenchant it.", target.link)
+        return nil
+    end
+    if TallyDB.keepUpgrades and IsUpgrade(itemID, target.link, target.level, wear) then
+        Print("%s is better than what you wear, nothing disenchanted.", target.link)
+        return nil
+    end
+    local spell = Tally.GetDisenchantSpellName()
+    if not spell then
+        return nil
+    end
+    return string.format("/cast %s\n/use %d %d", spell, target.bag, target.slot)
+end
+
+--------------------------------------------------------------------------------
 -- Counting
 --------------------------------------------------------------------------------
 
@@ -535,7 +874,9 @@ local function Recount()
 
     Tally.bags = bags
     Tally.ammo = ammo
-    Debug("bags %d/%d free, ammo %d (shown: %s)", bags.free, bags.total, ammo.count, tostring(ammo.shown))
+    Tally.disenchant = FindDisenchants(bags)
+    Debug("bags %d/%d free, ammo %d (shown: %s), disenchant %d", bags.free, bags.total, ammo.count,
+        tostring(ammo.shown), Tally.disenchant.count)
 end
 
 local function RunUpdate()
@@ -581,6 +922,11 @@ local function PrintStatus()
             print(string.format("  also in bags: %d x %s", entry.count, GetItemName(entry.itemID)))
         end
     end
+    local disenchant = Tally.disenchant
+    if disenchant.known then
+        Print("disenchant: %d %s%s", disenchant.count, disenchant.count == 1 and "item" or "items",
+            disenchant.tight and " that free a slot" or "")
+    end
 end
 
 local function PrintHelp()
@@ -590,7 +936,7 @@ local function PrintHelp()
     print("  /tally unlock  - move the counters outside Edit Mode")
     print("  /tally lock  - lock the counters")
     print("  /tally reset  - put the counters back in the bottom-right corner")
-    print("  /tally keep  - list the items never offered for deletion")
+    print("  /tally keep  - list the items never offered for deletion or disenchanting")
     print("  /tally keep <item>  - add or remove an item (shift-click it into chat)")
     print("  /tally keep clear  - forget all kept items")
     print("  /tally debug  - toggle debug output")
@@ -599,10 +945,10 @@ end
 local function HandleKeep(arg)
     if not arg then
         if Tally.GetKeptCount() == 0 then
-            Print("no kept items. Right-click the bag counter to always keep the item it offers.")
+            Print("no kept items. Right-click the bag or disenchant counter to always keep the item it offers.")
             return
         end
-        Print("never offered for deletion:")
+        Print("never offered for deletion or disenchanting:")
         for itemID in pairs(TallyDB.keep) do
             print("  " .. GetItemName(itemID))
         end
@@ -668,6 +1014,11 @@ frame:RegisterEvent("BAG_UPDATE")
 frame:RegisterEvent("BAG_UPDATE_DELAYED")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+frame:RegisterEvent("SPELLS_CHANGED")
+-- The disenchant button is secure: it is put away as combat starts and
+-- brought back after.
+frame:RegisterEvent("PLAYER_REGEN_DISABLED")
+frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 -- Switching between gamepad and mouse-and-keyboard shows or hides the
 -- counters. Not every client has these events.
@@ -692,6 +1043,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         or event == "GAME_PAD_CONFIGS_CHANGED" then
         if ns.display and ns.display.UpdateVisibility then
             ns.display.UpdateVisibility()
+        end
+    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+        if ns.display and ns.display.UpdateDisenchantButton then
+            ns.display.UpdateDisenchantButton(event == "PLAYER_REGEN_DISABLED")
         end
     else
         Tally.RequestUpdate()

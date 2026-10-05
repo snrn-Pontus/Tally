@@ -16,6 +16,7 @@ Each counter is a round slot in the style of the crossbar with the number beside
 | --- | --- |
 | Bags | Free slots in bags that hold anything (backpack and normal bags) |
 | Reagent bag | Free slots in one reagent bag, when **Reagent bags** is set to **Own counter per bag** |
+| Disenchant | Soulbound items you can disenchant, when you know Disenchant |
 | Ammo | Every arrow or bullet of the equipped ammo type in your bags |
 
 - The number turns **yellow** when it gets low (4 free slots, 200 ammo by default) and **red** at zero.
@@ -40,6 +41,25 @@ Any item, grey or white, can also be kept for good: right-click the bag counter 
 
 If **Auctionator**, **TradeSkillMaster** or **Auctioneer** is installed, a grey is worth the higher of its vendor and auction price, so a grey that sells well on the auction house is not the one offered. The tooltip names the addon when its price was used. None of them is required; set **Value greys by** to **Vendor price** to ignore them.
 
+## Disenchanting
+
+With Enchanting learned, a disenchant counter shows how many soulbound green, blue and purple weapons and armor are in your bags. Bind-on-equip items are left alone, since they can still go to the auction house. Hover it to see what a click would disenchant:
+
+- **Click** disenchants soulbound gear you can never wear: the wrong armor type, a weapon you have no skill in, another class's item. It is only good for materials, so there is no confirmation.
+- **Shift-click** disenchants gear you could wear, now or once you reach its level. The modifier keeps that from happening by accident.
+- **Right-click** (or shift-right-click) always keeps that item instead, on the same keep list as greys.
+
+Disenchanting frees the item's slot, but the materials need a slot too unless they stack with ones you already carry. Tally knows what Classic gear most likely disenchants into (dust for armor, essence for weapons, shards for rare items, by item level) and checks whether your stacks have room for it:
+
+- **Bags not tight** (more free slots than **Yellow at free slots**): every soulbound item counts. Items that free a slot are offered first, then the one worth least at a vendor.
+- **Bags getting full**: only items whose likely material stacks with yours count, so every disenchant frees a slot.
+
+Gear better than what you wear is never offered: with **Never disenchant upgrades** on (the default), an item counts as an upgrade when it has a higher item level than the weakest item in its slot (both rings, both trinkets), or that slot is empty. With **Pawn** installed, Pawn's upgrade arrow decides instead. Items you cannot wear (red text on the tooltip: wrong armor type, class or level) are never upgrades. The tooltip lists the items held back and why.
+
+The tooltip says which material is likely and whether it frees a slot. Items past the Classic item levels have no known result and are only offered while space is no issue.
+
+Casting a spell needs a secure button, so the counter has one laid over it out of combat. It is put away when combat starts (disenchanting waits until you leave combat), so the counters can still move in combat. Untick **Show disenchant counter** to turn it off.
+
 ## Gamepad mode only
 
 By default the counters only show in gamepad mode, since mouse-and-keyboard mode already has the bag bar and the Shoot button count. Untick **Only show in gamepad mode** to always show them. They are also shown while you move them.
@@ -60,6 +80,7 @@ Open WoW's Edit Mode, or tick **Unlock counters outside Edit Mode** in the setti
 - Keep whites worth
 - Forget kept items
 - Value greys by: auction price when known, or vendor price
+- Show disenchant counter, and never disenchant upgrades
 - Show ammo: with a ranged weapon or quiver, always or never
 - Yellow at ammo
 - Only show in gamepad mode
@@ -79,7 +100,7 @@ Every choice is a click-to-cycle button (left-click next, right-click previous);
 /tally unlock    move the counters outside Edit Mode
 /tally lock      lock them again
 /tally reset     back to the bottom-right corner
-/tally keep      list items never offered for deletion
+/tally keep      list items never offered for deletion or disenchanting
 /tally keep <item>  keep an item, or stop keeping it (shift-click it into chat)
 /tally keep clear   forget all kept items
 /tally debug     toggle debug output

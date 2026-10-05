@@ -1,5 +1,12 @@
 # Tally changelog
 
+## Unreleased
+
+- **Disenchant from a counter.** With Enchanting learned, a disenchant counter shows your soulbound green, blue and purple weapons and armor. Click it to disenchant soulbound gear you can never wear (wrong armor type, weapon skill or class); gear you could wear, now or at a higher level, takes a shift-click. Right-click always keeps the item. Bind-on-equip items are never offered.
+- Tally works out whether a disenchant frees a bag slot: the item's likely material (by Classic item level) has to stack with what you carry. With bags at or below the yellow warning only those items are offered; otherwise any soulbound item is, slot-freeing ones first.
+- Upgrades are never disenchanted: items with a higher item level than what you wear in their slot (or for an empty slot), or Pawn's upgrade arrow when Pawn is installed. Items you cannot wear don't count. The tooltip lists what was held back; **Never disenchant upgrades** turns it off.
+- The counter uses a secure button out of combat only, so the counters still move freely in combat. **Show disenchant counter** turns it off.
+
 ## 0.2.0
 
 - Fixed: a phantom ammo counter with a "?" icon, "item:0" and a count of 1 showed with no ammo equipped. Only arrows and bullets in the ammo slot count as equipped ammo now. Empty bag slots are no longer listed in the bag tooltip either.
