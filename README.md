@@ -2,7 +2,7 @@
 
 Free bag slots and ammo count in the bottom-right corner, for **WoW: Forever**'s gamepad HUD. The gamepad crossbar replaces the bag bar and the Shoot button, so in gamepad mode nothing on screen tells you how full your bags are or how many arrows you have left. Tally puts both numbers back.
 
-Tally is part of the SNRN addon family, next to [Rummage](https://github.com/snrn-Pontus/Rummage) and [Backhand](https://github.com/snrn-Pontus/Backhand).
+Tally is part of the SNRN addon family, next to [Rummage](https://github.com/snrn-Pontus/Rummage), [Backhand](https://github.com/snrn-Pontus/Backhand), [Valet](https://github.com/snrn-Pontus/Valet) and [Grimoire](https://github.com/snrn-Pontus/Grimoire).
 
 <!-- Screenshot: the counters in the bottom-right corner. -->
 

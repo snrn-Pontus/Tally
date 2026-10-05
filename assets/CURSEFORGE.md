@@ -71,6 +71,8 @@ The counters only show in gamepad mode by default. The Settings page is built so
 
 - **[SNRN Rummage](https://www.curseforge.com/wow/addons/snrn-rummage)**: one action slot per item type that always uses the best food, drink, potion, bandage or quest item in your bags. Tally tells you when your bags are full; Rummage makes sure the right stack gets used.
 - **[SNRN Backhand](https://www.curseforge.com/wow/addons/snrn-backhand)**: four extra action slots for your controller's rear paddles (Xbox Elite, DualSense Edge, Steam Input back buttons), built into Forever's native crossbar.
+- **[SNRN Valet](https://www.curseforge.com/wow/addons/snrn-valet)**: sells greys and repairs at merchants, collects your mail, and declines duels, guild invites and charters. Greys you keep with Tally are not sold.
+- **[SNRN Grimoire](https://www.curseforge.com/wow/addons/snrn-grimoire)**: one command lays out an Affliction Warlock on Forever's gamepad crossbar and Backhand's paddles.
 
 ## Reporting problems
 
