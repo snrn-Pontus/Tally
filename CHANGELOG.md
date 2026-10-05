@@ -6,7 +6,7 @@
 - **Reagent bags can have their own counter.** Set **Reagent bags** to **Own counter per bag** and each reagent bag gets a counter with its icon, left out of the bag counter. The default still counts them with your bags; either way the tooltip marks them as reagent bags.
 
 - **Delete your cheapest grey item from the bag counter.** The bag tooltip names the grey item worth the least at a vendor. Click the counter and the tooltip asks to delete it; click again to delete it, or move away to cancel. No bags or popups are opened, so the gamepad freeze from 0.1.0 cannot come back. Can be turned off in the settings.
-- Optionally include white items: the cheapest grey or white item is offered. Ammo, quest items, keys and items a vendor will not buy are never offered.
+- Optionally include white items: the cheapest grey or white item is offered. Grey or white, ammo, quest items (including grey quest starters), keys and items a vendor will not buy are never offered.
 - With white items included, trade goods, consumables, reagents and recipes are kept by default (one setting each), and white stacks worth at least a set amount can be kept too.
 - Right-click the bag counter to always keep the item it offers. `/tally keep` lists, adds and removes kept items.
 - Greys can be valued by auction price from Auctionator, TradeSkillMaster or Auctioneer when one is installed (the higher of vendor and auction price counts). Optional; set **Value greys by** to **Vendor price** to ignore them.

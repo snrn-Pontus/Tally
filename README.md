@@ -29,7 +29,7 @@ Each counter is a round slot in the style of the crossbar with the number beside
 
 The bag tooltip also names your cheapest grey item: the one worth the least at a vendor (price times stack size). Click the bag counter and the tooltip asks whether to delete it; click again to delete it, or move the pointer away to cancel. The question is asked in the tooltip rather than a popup, because Tally never opens Blizzard windows from a click (see the gamepad note). Untick **Click the bag counter to delete greys** to turn it off.
 
-Tick **Include white items** to let white items compete too: the cheapest grey or white item is offered. Ammo, quest items, keys and anything a vendor will not buy (such as your Hearthstone) are never offered.
+Tick **Include white items** to let white items compete too: the cheapest grey or white item is offered. Whether grey or white, ammo, quest items (including grey quest starters), keys and anything a vendor will not buy (such as your Hearthstone) are never offered.
 
 With white items included, more is kept for you to sell or use instead:
 
