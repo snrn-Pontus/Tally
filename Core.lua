@@ -733,17 +733,46 @@ local function WearState(bag, slot, itemID)
     return state
 end
 
--- Pawn's upgrade arrow, when Pawn is installed: true or false, or nil when
--- Pawn has no opinion.
+-- Pawn answers nil for "not sure yet" (item data not loaded, or its
+-- per-frame budget spent), so such items are held back and asked again on a
+-- later recount. After this many tries in a row the item level decides,
+-- so an item Pawn never rates does not stay hidden for good.
+local PAWN_RETRY_DELAY = 1
+local PAWN_MAX_TRIES = 10
+local pawnTries = {}
+local pawnRetryScheduled = false
+
+local function SchedulePawnRetry()
+    if not pawnRetryScheduled then
+        pawnRetryScheduled = true
+        C_Timer.After(PAWN_RETRY_DELAY, function()
+            pawnRetryScheduled = false
+            Tally.RequestUpdate()
+        end)
+    end
+end
+
+-- Pawn's upgrade arrow: true or false, "pending" while Pawn is not sure
+-- yet, or nil without Pawn (or once it has been asked often enough).
 local function PawnSaysUpgrade(link)
     if type(PawnShouldItemLinkHaveUpgradeArrow) ~= "function" then
         return nil
     end
     local ok, upgrade = pcall(PawnShouldItemLinkHaveUpgradeArrow, link)
-    if ok and upgrade ~= nil then
+    if not ok then
+        return nil
+    end
+    if upgrade ~= nil then
+        pawnTries[link] = nil
         return upgrade and true or false
     end
-    return nil
+    local tries = (pawnTries[link] or 0) + 1
+    pawnTries[link] = tries
+    if tries > PAWN_MAX_TRIES then
+        return nil
+    end
+    SchedulePawnRetry()
+    return "pending"
 end
 
 -- Whether an item you can wear now would be better than what you wear:
@@ -757,7 +786,9 @@ local function IsUpgrade(itemID, link, level, wear)
         return false
     end
     local pawn = link and PawnSaysUpgrade(link)
-    if pawn ~= nil then
+    if pawn == "pending" then
+        return true, "Pawn checking"
+    elseif pawn ~= nil then
         return pawn, "Pawn"
     end
     if not level then
@@ -977,9 +1008,15 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("%s is gear you can wear: shift-click to disenchant it.", target.link)
         return nil
     end
-    if TallyDB.keepUpgrades and IsUpgrade(itemID, link, target.level, wear) then
-        Print("%s is better than what you wear, nothing disenchanted.", target.link)
-        return nil
+    if TallyDB.keepUpgrades then
+        local upgrade, reason = IsUpgrade(itemID, link, target.level, wear)
+        if upgrade and reason == "Pawn checking" then
+            Print("Pawn has not rated %s yet, nothing disenchanted.", target.link)
+            return nil
+        elseif upgrade then
+            Print("%s is better than what you wear, nothing disenchanted.", target.link)
+            return nil
+        end
     end
     local spell = Tally.GetDisenchantSpellName()
     if not spell then
