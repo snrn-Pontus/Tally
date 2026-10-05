@@ -457,6 +457,9 @@ local DISENCHANT_BANDS = {
     { maxLevel = 50, dust = 11176, essence = 11175, shard = 11178 },
     { maxLevel = 55, dust = 11176, essence = 16202, shard = 14343 },
     { maxLevel = 65, dust = 16204, essence = 16203, shard = 14344, crystal = 20725 },
+    -- Classic endgame epics up to level 88 still give Nexus Crystals.
+    -- Green and blue gear this high is not Classic, so it stays unknown.
+    { maxLevel = 99, crystal = 20725 },
 }
 
 -- The most one disenchant gives of each kind, and its stack size for when
@@ -545,6 +548,9 @@ local function PossibleMaterials(classID, quality, level)
     end
     for _, band in ipairs(DISENCHANT_BANDS) do
         if level <= band.maxLevel then
+            if not band.shard and quality ~= ITEM_QUALITY_EPIC then
+                return nil
+            end
             if quality == ITEM_QUALITY_EPIC then
                 if band.crystal then
                     return { { band.crystal, "crystal" } }
@@ -774,6 +780,7 @@ local SKILL_BANDS = {
     { maxLevel = 55, skill = 175 },
     { maxLevel = 60, skill = 200 },
     { maxLevel = 65, skill = 225 },
+    { maxLevel = 99, skill = 225 },
 }
 
 local function RequiredSkill(level, quality)
@@ -927,8 +934,10 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("put down what you are holding first.")
         return nil
     end
-    local itemID, _, quality, locked = GetBagSlotItem(target.bag, target.slot)
-    if itemID ~= target.itemID or locked then
+    local itemID, _, quality, locked, link = GetBagSlotItem(target.bag, target.slot)
+    -- The full link, so another copy with a different random enchant does
+    -- not pass for the item that was offered.
+    if itemID ~= target.itemID or (link and link ~= target.link) or locked then
         Print("that item moved, nothing disenchanted.")
         return nil
     end
@@ -945,7 +954,7 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("%s is gear you can wear: shift-click to disenchant it.", target.link)
         return nil
     end
-    if TallyDB.keepUpgrades and IsUpgrade(itemID, target.link, target.level, wear) then
+    if TallyDB.keepUpgrades and IsUpgrade(itemID, link, target.level, wear) then
         Print("%s is better than what you wear, nothing disenchanted.", target.link)
         return nil
     end
