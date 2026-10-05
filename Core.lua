@@ -463,7 +463,7 @@ local DISENCHANT_BANDS = {
 
 -- The most one disenchant gives of each kind, and its stack size for when
 -- the client has not cached the material yet.
-local MATERIAL_YIELD = { dust = 5, essence = 2, shard = 1, epicShard = 5, crystal = 2 }
+local MATERIAL_YIELD = { dust = 6, essence = 2, shard = 1, epicShard = 5, crystal = 2 }
 local MATERIAL_STACK = { dust = 20, essence = 10, shard = 20, epicShard = 20, crystal = 20 }
 
 function Tally.KnowsDisenchant()

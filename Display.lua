@@ -363,8 +363,19 @@ local function OnDisenchantPostClick(self)
 end
 
 local function CreateDisenchantButton()
-    local button = CreateFrame("Button", "TallyDisenchantButton", UIParent, "SecureActionButtonTemplate")
+    local button = CreateFrame("Button", "TallyDisenchantButton", UIParent, "SecureActionButtonTemplate, SecureHandlerStateTemplate")
     button:Hide()
+    -- Put away as combat starts. This runs in the secure environment, which
+    -- may hide and unanchor the button even once the lockdown has begun, so
+    -- it does not depend on PLAYER_REGEN_DISABLED arriving first.
+    button:SetAttribute("_onstate-tallycombat", [[
+        if newstate == "1" then
+            self:SetAttribute("type", nil)
+            self:Hide()
+            self:ClearAllPoints()
+        end
+    ]])
+    RegisterStateDriver(button, "tallycombat", "[combat] 1; 0")
     button:SetFrameStrata(container:GetFrameStrata())
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Act on the release like the other counters, whatever the key-down CVar.
@@ -379,10 +390,11 @@ local function CreateDisenchantButton()
 end
 
 -- Lays the secure button over the counter while it is visible, out of
--- combat and outside Edit Mode. As combat starts (PLAYER_REGEN_DISABLED
--- comes just before the lockdown) it is hidden and unanchored, so the
--- counters stay free to move and resize in combat. It is only created out
--- of combat, since a protected frame cannot be hidden during it.
+-- combat and outside Edit Mode. As combat starts the state driver hides and
+-- unanchors it, so the counters stay free to move and resize in combat;
+-- PLAYER_REGEN_DISABLED does the same here when it still comes before the
+-- lockdown. It is only created out of combat, since a protected frame
+-- cannot be set up during it.
 function ns.display.UpdateDisenchantButton(enteringCombat)
     if not container or InCombatLockdown() then
         return
