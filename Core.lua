@@ -499,10 +499,10 @@ local function ScanBagItem(bag, slot)
     return scanTooltip
 end
 
--- Bound to you alone. C_Item.IsBound is also true for account-bound items,
--- which another character could still use, so the tooltip has to say
--- "Soulbound".
-local function IsSoulbound(bag, slot)
+-- Bound to you alone and not marked "Cannot be disenchanted". C_Item.IsBound
+-- is also true for account-bound items, which another character could
+-- still use, so the tooltip has to say "Soulbound".
+local function IsSoulboundAndDisenchantable(bag, slot)
     if C_Item and C_Item.IsBound and ItemLocation and ItemLocation.CreateFromBagAndSlot then
         local ok, bound = pcall(C_Item.IsBound, ItemLocation:CreateFromBagAndSlot(bag, slot))
         if ok and not bound then
@@ -513,8 +513,11 @@ local function IsSoulbound(bag, slot)
     local soulbound = false
     for i = 2, tooltip:NumLines() do
         local line = _G["TallyScanTooltipTextLeft" .. i]
-        if line and line:GetText() == (ITEM_SOULBOUND or "Soulbound") then
+        local text = line and line:GetText()
+        if text == (ITEM_SOULBOUND or "Soulbound") then
             soulbound = true
+        elseif text == (ITEM_DISENCHANT_NOT_DISENCHANTABLE or "Cannot be disenchanted") then
+            soulbound = false
             break
         end
     end
@@ -578,7 +581,7 @@ local function IsDisenchantCandidate(itemID, quality, bag, slot)
     if classID ~= ITEM_CLASS_WEAPON and classID ~= ITEM_CLASS_ARMOR then
         return false
     end
-    return IsSoulbound(bag, slot) and not IsQuestItem(bag, slot)
+    return IsSoulboundAndDisenchantable(bag, slot) and not IsQuestItem(bag, slot)
 end
 
 -- Where each kind of gear goes. One-handers also count the off hand, but
@@ -757,8 +760,9 @@ end
 local ENCHANTING_SKILL_LINE = 333
 local ENCHANTING_SPELL = 7411
 
--- Enchanting skill Classic asks for to disenchant gear, by item level.
--- Items past the table are not checked; the game refuses those itself.
+-- Enchanting skill Classic asks for to disenchant green gear, by item
+-- level. Blue gear needs at least 25 and purple gear from level 56 needs
+-- 225. Items past the table are not checked; the game refuses those itself.
 local SKILL_BANDS = {
     { maxLevel = 20, skill = 1 },
     { maxLevel = 25, skill = 25 },
@@ -772,13 +776,19 @@ local SKILL_BANDS = {
     { maxLevel = 65, skill = 225 },
 }
 
-local function RequiredSkill(level)
+local function RequiredSkill(level, quality)
     if not level then
         return nil
     end
     for _, band in ipairs(SKILL_BANDS) do
         if level <= band.maxLevel then
-            return band.skill
+            local skill = band.skill
+            if quality == ITEM_QUALITY_EPIC and level >= 56 then
+                skill = math.max(skill, 225)
+            elseif quality and quality > ITEM_QUALITY_UNCOMMON then
+                skill = math.max(skill, 25)
+            end
+            return skill
         end
     end
     return nil
@@ -811,8 +821,8 @@ local function GetEnchantingSkill()
     return nil
 end
 
-local function SkillTooLow(level, skill)
-    local required = RequiredSkill(level)
+local function SkillTooLow(level, quality, skill)
+    local required = RequiredSkill(level, quality)
     return skill ~= nil and required ~= nil and skill < required
 end
 
@@ -853,7 +863,7 @@ local function FindDisenchants(bags)
                 held[itemID].count = held[itemID].count + count
                 held[itemID].stacks = held[itemID].stacks + 1
                 if not locked and IsDisenchantCandidate(itemID, quality, bag, slot)
-                    and not SkillTooLow(GetItemLevel(itemID, link), skill) then
+                    and not SkillTooLow(GetItemLevel(itemID, link), quality, skill) then
                     local wear = WearState(bag, slot, itemID)
                     local candidate = {
                         bag = bag,
@@ -926,7 +936,7 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("%s is no longer offered, nothing disenchanted.", target.link)
         return nil
     end
-    if SkillTooLow(target.level, GetEnchantingSkill()) then
+    if SkillTooLow(target.level, quality, GetEnchantingSkill()) then
         Print("%s needs more Enchanting skill, nothing disenchanted.", target.link)
         return nil
     end
