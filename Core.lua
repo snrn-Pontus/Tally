@@ -53,6 +53,7 @@ local DEFAULTS = {
     keepWhitesWorth = 0,      -- with whites on: never offer white stacks worth this much (copper; 0 = off)
     junkPrice = "auction",    -- "vendor" | "auction" (higher of vendor and auction addon price)
     reagentBags = "combined", -- "combined" | "separate" (each reagent bag gets its own counter)
+    professionBags = true,    -- herb, enchanting, soul and other profession bags get their own counter
     showDisenchant = true,    -- disenchant counter, when you know Disenchant
     keepUpgrades = true,      -- never offer gear better than what you wear
     unlocked = false,
@@ -983,6 +984,7 @@ local function Recount()
     local ammo = { count = 0, list = {}, bagFree = 0, bagTotal = 0, hasAmmoBag = false }
     local ammoByItem = {}
     local separateReagents = TallyDB and TallyDB.reagentBags == "separate"
+    local separateProfession = TallyDB and TallyDB.professionBags
 
     for bag = 0, LastBagIndex() do
         local slots = GetNumSlots(bag)
@@ -994,6 +996,10 @@ local function Recount()
             local classID = GetItemClass(itemID)
             local isAmmoBag = classID == ITEM_CLASS_QUIVER
             local isReagentBag = IsReagentBag(bag)
+            -- Herb, enchanting, soul and other profession bags only take
+            -- their own kind of item, so they may have room when your bags
+            -- are full. Quivers and ammo pouches show on the ammo counter.
+            local isProfessionBag = family ~= 0 and not isReagentBag and not isAmmoBag
             local entry = {
                 bag = bag,
                 itemID = itemID,
@@ -1004,7 +1010,8 @@ local function Recount()
                 special = family ~= 0 and not isReagentBag,
                 ammoBag = isAmmoBag,
                 reagentBag = isReagentBag,
-                separate = isReagentBag and separateReagents,
+                professionBag = isProfessionBag,
+                separate = (isReagentBag and separateReagents) or (isProfessionBag and separateProfession) or false,
             }
             bags.list[#bags.list + 1] = entry
             if entry.separate then
@@ -1101,7 +1108,7 @@ local function PrintStatus()
     local bags = Tally.bags
     Print("bags: %d of %d slots free", bags.free, bags.total)
     for _, entry in ipairs(bags.list) do
-        local note = entry.ammoBag and " (ammo)" or entry.separate and " (reagents, own counter)"
+        local note = entry.ammoBag and " (ammo)" or entry.separate and " (own counter)"
             or entry.reagentBag and " (reagents)" or entry.special and " (special, not counted)" or ""
         print(string.format("  %s: %d/%d free%s", entry.name, entry.free, entry.total, note))
     end

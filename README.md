@@ -16,12 +16,14 @@ Each counter is a round slot in the style of the crossbar with the number beside
 | --- | --- |
 | Bags | Free slots in bags that hold anything (backpack and normal bags) |
 | Reagent bag | Free slots in one reagent bag, when **Reagent bags** is set to **Own counter per bag** |
+| Profession bag | Free slots in one herb, enchanting, soul or other profession bag, with the bag's icon |
 | Disenchant | Soulbound items you can disenchant, when you know Disenchant |
 | Ammo | Every arrow or bullet of the equipped ammo type in your bags |
 
 - The number turns **yellow** when it gets low (4 free slots, 200 ammo by default) and **red** at zero.
 - Quivers, ammo pouches, soul bags and profession bags are not counted as free bag slots: loot cannot go there. The bag tooltip still lists them.
 - Reagent bags are counted with your bags by default and marked "reagents" in the tooltip. Set **Reagent bags** to **Own counter per bag** to leave them out of the bag counter and give each reagent bag its own counter, with that bag's icon.
+- Herb, enchanting, soul and other profession bags each get their own counter with the bag's icon, so you can see your herb bag still has room when your bags are full. Untick **Own counter for profession bags** to only list them in the bag tooltip.
 - Empty bag slots are not listed.
 - The ammo counter appears when you have a bow, gun or crossbow, a quiver or ammo pouch, or ammo equipped. It shows the equipped ammo's icon.
 - Hover a counter for the details: free slots per bag, quiver slots, and any other ammo in your bags.
@@ -76,6 +78,7 @@ Open WoW's Edit Mode, or tick **Unlock counters outside Edit Mode** in the setti
 
 - Show free bag slots, and as: free (23), free / total (23/80) or used / total (57/80)
 - Reagent bags: with your bags, or an own counter per bag
+- Own counter for profession bags
 - Yellow at free slots
 - Click the bag counter to delete greys
 - Include white items, and keep trade goods, consumables, reagents and recipes

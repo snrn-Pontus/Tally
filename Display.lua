@@ -161,7 +161,7 @@ local function ShowBagTooltip(owner)
     end
     local hasSpecial = false
     for _, entry in ipairs(bags.list) do
-        hasSpecial = hasSpecial or entry.special
+        hasSpecial = hasSpecial or (entry.special and not entry.separate)
     end
     if hasSpecial then
         GameTooltip:AddLine(" ")
@@ -248,7 +248,11 @@ local function ShowReagentTooltip(owner)
     GameTooltip:SetText(IconText(entry.icon, entry.name), 1, 1, 1)
     GameTooltip:AddLine(string.format("%d of %d slots free", entry.free, entry.total), nil, nil, nil, true)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Reagent bag: holds only crafting reagents, so it has its own counter and is not counted with your bags.", 0.62, 0.62, 0.62, true)
+    if entry.professionBag then
+        GameTooltip:AddLine("Profession bag: holds only its own kind of item (herbs, enchanting materials, soul shards and so on), so it can have room when your bags are full. It has its own counter and is not counted with your bags.", 0.62, 0.62, 0.62, true)
+    else
+        GameTooltip:AddLine("Reagent bag: holds only crafting reagents, so it has its own counter and is not counted with your bags.", 0.62, 0.62, 0.62, true)
+    end
     GameTooltip:Show()
 end
 
@@ -477,8 +481,8 @@ local function CreateReadout(key, onEnter, onClick)
     return readout
 end
 
--- Reagent bag counters are made as bags are equipped, one per reagent bag
--- slot, and hidden when there are fewer reagent bags than counters.
+-- Reagent and profession bag counters are made as bags are equipped, one
+-- per such bag, and hidden when there are fewer such bags than counters.
 local function GetReagentReadout(index)
     local readout = readouts.reagents[index]
     if not readout then
