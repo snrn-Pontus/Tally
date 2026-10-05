@@ -570,16 +570,92 @@ local OFF_HAND_SLOT = 17
 
 local scanTooltip
 
--- "Requires Level %d" as a pattern, to tell a level requirement apart from
--- the other red lines.
-local LEVEL_PATTERN = "^" .. (ITEM_MIN_LEVEL or "Requires Level %d"):gsub("%%d", "%%d+") .. "$"
--- A broken item's durability line is red too, but it can be repaired.
+-- A broken item's durability line is red, but it can be repaired.
 local DURABILITY_PATTERN = "^" .. (DURABILITY_TEMPLATE or "Durability %d / %d"):gsub("%%d", "%%d+") .. "$"
+-- "Classes: %s" and "Races: %s" restrictions are for good.
+local CLASSES_PREFIX = "^" .. (ITEM_CLASSES_ALLOWED or "Classes: %s"):gsub("%%s.*", "")
+local RACES_PREFIX = "^" .. (ITEM_RACES_ALLOWED or "Races: %s"):gsub("%%s.*", "")
 
--- Whether you can wear an item: "now", "later" (only its level is too high)
--- or "never" (red text for armor type, weapon skill, class or race, which
--- leveling does not fix).
-local function WearState(bag, slot)
+-- Armor and weapon types each Classic class can ever learn, counting
+-- proficiencies trained later (mail and plate at level 40, weapon skills
+-- from a weapon master). Types a class might learn are listed rather than
+-- left out: a type missing here would let a plain click disenchant gear
+-- the class could still wear. Classes not listed are never ruled out.
+local ARMOR = {
+    misc = 0, cloth = 1, leather = 2, mail = 3, plate = 4, shield = 6,
+    libram = 7, idol = 8, totem = 9,
+}
+local WEAPON = {
+    axe1 = 0, axe2 = 1, bow = 2, gun = 3, mace1 = 4, mace2 = 5, polearm = 6,
+    sword1 = 7, sword2 = 8, staff = 10, fist = 13, misc = 14, dagger = 15,
+    thrown = 16, spear = 17, crossbow = 18, wand = 19, fishing = 20,
+}
+local function TypeSet(names, ids)
+    local set = {}
+    for _, name in ipairs(names) do
+        set[ids[name]] = true
+    end
+    return set
+end
+local LEARNABLE = {
+    WARRIOR = {
+        armor = TypeSet({ "misc", "cloth", "leather", "mail", "plate", "shield" }, ARMOR),
+        weapon = TypeSet({ "axe1", "axe2", "bow", "gun", "mace1", "mace2", "polearm", "sword1", "sword2",
+            "staff", "fist", "misc", "dagger", "thrown", "spear", "crossbow", "fishing" }, WEAPON),
+    },
+    PALADIN = {
+        armor = TypeSet({ "misc", "cloth", "leather", "mail", "plate", "shield", "libram" }, ARMOR),
+        weapon = TypeSet({ "axe1", "axe2", "mace1", "mace2", "polearm", "sword1", "sword2", "misc", "spear",
+            "fishing" }, WEAPON),
+    },
+    HUNTER = {
+        armor = TypeSet({ "misc", "cloth", "leather", "mail" }, ARMOR),
+        weapon = TypeSet({ "axe1", "axe2", "bow", "gun", "polearm", "sword1", "sword2", "staff", "fist",
+            "misc", "dagger", "thrown", "spear", "crossbow", "fishing" }, WEAPON),
+    },
+    ROGUE = {
+        armor = TypeSet({ "misc", "cloth", "leather" }, ARMOR),
+        weapon = TypeSet({ "axe1", "bow", "gun", "mace1", "sword1", "fist", "misc", "dagger", "thrown",
+            "crossbow", "fishing" }, WEAPON),
+    },
+    PRIEST = {
+        armor = TypeSet({ "misc", "cloth" }, ARMOR),
+        weapon = TypeSet({ "mace1", "staff", "misc", "dagger", "wand", "fishing" }, WEAPON),
+    },
+    SHAMAN = {
+        armor = TypeSet({ "misc", "cloth", "leather", "mail", "shield", "totem" }, ARMOR),
+        weapon = TypeSet({ "axe1", "axe2", "mace1", "mace2", "staff", "fist", "misc", "dagger", "fishing" }, WEAPON),
+    },
+    MAGE = {
+        armor = TypeSet({ "misc", "cloth" }, ARMOR),
+        weapon = TypeSet({ "sword1", "staff", "misc", "dagger", "wand", "fishing" }, WEAPON),
+    },
+    WARLOCK = {
+        armor = TypeSet({ "misc", "cloth" }, ARMOR),
+        weapon = TypeSet({ "sword1", "staff", "misc", "dagger", "wand", "fishing" }, WEAPON),
+    },
+    DRUID = {
+        armor = TypeSet({ "misc", "cloth", "leather", "idol" }, ARMOR),
+        weapon = TypeSet({ "mace1", "mace2", "polearm", "staff", "fist", "misc", "dagger", "fishing" }, WEAPON),
+    },
+}
+
+local function ClassCanEverLearn(itemID)
+    local learnable = LEARNABLE[select(2, UnitClass("player"))]
+    if not learnable then
+        return true
+    end
+    local classID, subclassID = GetItemClass(itemID)
+    local types = classID == ITEM_CLASS_WEAPON and learnable.weapon
+        or classID == ITEM_CLASS_ARMOR and learnable.armor
+    return not types or subclassID == nil or types[subclassID] == true
+end
+
+-- Whether you can wear an item: "now", "later" or "never". Only a class or
+-- race restriction, or red text on an armor or weapon type your class can
+-- never learn, is "never". Any other red text (level, an untrained but
+-- learnable proficiency, a profession, reputation) is "later".
+local function WearState(bag, slot, itemID)
     if not scanTooltip then
         scanTooltip = CreateFrame("GameTooltip", "TallyScanTooltip", nil, "GameTooltipTemplate")
     end
@@ -594,7 +670,7 @@ local function WearState(bag, slot)
             if text then
                 local r, g, b = line:GetTextColor()
                 if r > 0.99 and g < 0.2 and b < 0.2 and not text:match(DURABILITY_PATTERN) then
-                    if not text:match(LEVEL_PATTERN) then
+                    if text:match(CLASSES_PREFIX) or text:match(RACES_PREFIX) then
                         scanTooltip:Hide()
                         return "never"
                     end
@@ -604,6 +680,9 @@ local function WearState(bag, slot)
         end
     end
     scanTooltip:Hide()
+    if state == "later" and not ClassCanEverLearn(itemID) then
+        return "never"
+    end
     return state
 end
 
@@ -654,6 +733,68 @@ local function IsUpgrade(itemID, link, level, wear)
     return false
 end
 
+local ENCHANTING_SKILL_LINE = 333
+local ENCHANTING_SPELL = 7411
+
+-- Enchanting skill Classic asks for to disenchant gear, by item level.
+-- Items past the table are not checked; the game refuses those itself.
+local SKILL_BANDS = {
+    { maxLevel = 20, skill = 1 },
+    { maxLevel = 25, skill = 25 },
+    { maxLevel = 30, skill = 50 },
+    { maxLevel = 35, skill = 75 },
+    { maxLevel = 40, skill = 100 },
+    { maxLevel = 45, skill = 125 },
+    { maxLevel = 50, skill = 150 },
+    { maxLevel = 55, skill = 175 },
+    { maxLevel = 60, skill = 200 },
+    { maxLevel = 65, skill = 225 },
+}
+
+local function RequiredSkill(level)
+    if not level then
+        return nil
+    end
+    for _, band in ipairs(SKILL_BANDS) do
+        if level <= band.maxLevel then
+            return band.skill
+        end
+    end
+    return nil
+end
+
+-- Your Enchanting skill, or nil when it cannot be read (nothing is ruled
+-- out then).
+local function GetEnchantingSkill()
+    if GetProfessions and GetProfessionInfo then
+        local professions = { GetProfessions() }
+        for i = 1, select("#", GetProfessions()) do
+            if professions[i] then
+                local _, _, rank, _, _, _, skillLine = GetProfessionInfo(professions[i])
+                if skillLine == ENCHANTING_SKILL_LINE then
+                    return rank
+                end
+            end
+        end
+    end
+    if GetNumSkillLines and GetSkillLineInfo then
+        local enchanting = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(ENCHANTING_SPELL))
+            or (GetSpellInfo and GetSpellInfo(ENCHANTING_SPELL)) or "Enchanting"
+        for i = 1, GetNumSkillLines() do
+            local name, isHeader, _, rank = GetSkillLineInfo(i)
+            if not isHeader and name == enchanting then
+                return rank
+            end
+        end
+    end
+    return nil
+end
+
+local function SkillTooLow(level, skill)
+    local required = RequiredSkill(level)
+    return skill ~= nil and required ~= nil and skill < required
+end
+
 -- Items that free a slot first, then the one worth least at a vendor.
 local function IsBetterTarget(candidate, best)
     if not best then
@@ -679,6 +820,7 @@ local function FindDisenchants(bags)
         return result
     end
     result.tight = bags.free <= (TallyDB.bagWarning or 0)
+    local skill = GetEnchantingSkill()
 
     local held = {}
     local candidates = {}
@@ -689,8 +831,9 @@ local function FindDisenchants(bags)
                 held[itemID] = held[itemID] or { count = 0, stacks = 0 }
                 held[itemID].count = held[itemID].count + count
                 held[itemID].stacks = held[itemID].stacks + 1
-                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot) then
-                    local wear = WearState(bag, slot)
+                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot)
+                    and not SkillTooLow(GetItemLevel(itemID, link), skill) then
+                    local wear = WearState(bag, slot, itemID)
                     local candidate = {
                         bag = bag,
                         slot = slot,
@@ -757,7 +900,11 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("%s is no longer offered, nothing disenchanted.", target.link)
         return nil
     end
-    local wear = WearState(target.bag, target.slot)
+    if SkillTooLow(target.level, GetEnchantingSkill()) then
+        Print("%s needs more Enchanting skill, nothing disenchanted.", target.link)
+        return nil
+    end
+    local wear = WearState(target.bag, target.slot, itemID)
     if requireSafe and wear ~= "never" then
         Print("%s is gear you can wear: shift-click to disenchant it.", target.link)
         return nil
@@ -1017,6 +1164,7 @@ frame:RegisterEvent("BAG_UPDATE_DELAYED")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 frame:RegisterEvent("SPELLS_CHANGED")
+pcall(frame.RegisterEvent, frame, "SKILL_LINES_CHANGED")
 -- The disenchant button is secure: it is put away as combat starts and
 -- brought back after.
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
