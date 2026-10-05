@@ -32,8 +32,9 @@ local ATLAS = {
 }
 
 local container
-local readouts = {}
+local readouts = { reagents = {} }
 local editModeActive = false
+local pendingDelete    -- the grey stack the first bag click offered to delete
 
 local function AtlasExists(name)
     if not name or not C_Texture or type(C_Texture.GetAtlasInfo) ~= "function" then
@@ -89,6 +90,54 @@ local function IconText(icon, text)
     return text
 end
 
+local function FormatMoney(copper)
+    if GetCoinTextureString then
+        return GetCoinTextureString(copper)
+    end
+    return copper .. "c"
+end
+
+local function JunkValue(junk)
+    local text = FormatMoney(junk.value)
+    if junk.source ~= "vendor" then
+        text = text .. " |cff9d9d9d(" .. junk.source .. ")|r"
+    end
+    return text
+end
+
+local function JunkText(junk)
+    local text = IconText(Tally.GetItemIcon(junk.itemID), junk.link)
+    if junk.count > 1 then
+        text = text .. " x" .. junk.count
+    end
+    return text
+end
+
+local function AddJunkLines()
+    if not TallyDB.clickToDelete then
+        return
+    end
+    GameTooltip:AddLine(" ")
+    if pendingDelete then
+        GameTooltip:AddLine("Delete this item?", 1, 0.28, 0.28)
+        GameTooltip:AddDoubleLine(JunkText(pendingDelete), JunkValue(pendingDelete), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddLine("Click again to delete it, right-click to always keep it, or move away to cancel.", 1, 0.28, 0.28, true)
+        return
+    end
+    local junk = Tally.FindCheapestJunk()
+    if junk then
+        GameTooltip:AddLine(TallyDB.deleteWhites and "Cheapest grey or white item:" or "Cheapest grey item:", 0.62, 0.62, 0.62)
+        GameTooltip:AddDoubleLine(JunkText(junk), JunkValue(junk), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddLine("Click to delete it, right-click to always keep it.", 0.62, 0.62, 0.62, true)
+    else
+        GameTooltip:AddLine(TallyDB.deleteWhites and "No grey or white items to delete." or "No grey items to delete.", 0.62, 0.62, 0.62)
+    end
+    local kept = Tally.GetKeptCount()
+    if kept > 0 then
+        GameTooltip:AddLine(string.format("%d %s always kept (/tally keep).", kept, kept == 1 and "item" or "items"), 0.62, 0.62, 0.62)
+    end
+end
+
 local function ShowBagTooltip(owner)
     local bags = Tally.bags
     GameTooltip:SetOwner(owner, "ANCHOR_TOPLEFT")
@@ -97,9 +146,13 @@ local function ShowBagTooltip(owner)
     GameTooltip:AddLine(" ")
     for _, entry in ipairs(bags.list) do
         local slots = string.format("%d/%d", entry.free, entry.total)
-        if entry.special then
-            local note = entry.ammoBag and "ammo" or "special"
+        if entry.separate then
+            GameTooltip:AddDoubleLine(IconText(entry.icon, entry.name), slots .. " |cff9d9d9d(own counter)|r", 0.62, 0.62, 0.62, 0.62, 0.62, 0.62)
+        elseif entry.special then
+            local note = entry.ammoBag and "ammo" or entry.reagentBag and "reagents" or "special"
             GameTooltip:AddDoubleLine(IconText(entry.icon, entry.name), slots .. " |cff9d9d9d(" .. note .. ")|r", 0.62, 0.62, 0.62, 0.62, 0.62, 0.62)
+        elseif entry.reagentBag then
+            GameTooltip:AddDoubleLine(IconText(entry.icon, entry.name), slots .. " |cff9d9d9d(reagents)|r", 1, 1, 1, 1, 1, 1)
         else
             GameTooltip:AddDoubleLine(IconText(entry.icon, entry.name), slots, 1, 1, 1, 1, 1, 1)
         end
@@ -112,6 +165,20 @@ local function ShowBagTooltip(owner)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Quivers, ammo pouches and other special bags are not counted: they cannot take loot.", 0.62, 0.62, 0.62, true)
     end
+    AddJunkLines()
+    GameTooltip:Show()
+end
+
+local function ShowReagentTooltip(owner)
+    local entry = owner.entry
+    if not entry then
+        return
+    end
+    GameTooltip:SetOwner(owner, "ANCHOR_TOPLEFT")
+    GameTooltip:SetText(IconText(entry.icon, entry.name), 1, 1, 1)
+    GameTooltip:AddLine(string.format("%d of %d slots free", entry.free, entry.total), nil, nil, nil, true)
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("Reagent bag: holds only crafting reagents, so it has its own counter and is not counted with your bags.", 0.62, 0.62, 0.62, true)
     GameTooltip:Show()
 end
 
@@ -146,10 +213,35 @@ end
 -- Readouts
 --------------------------------------------------------------------------------
 
--- Hover-only on purpose. Opening the bags from an addon click taints the
--- gamepad controls that come with them, and Forever then loops forever on the
--- ADDON_ACTION_FORBIDDEN popup for SetPreferredGamepadInteractTarget.
-local function CreateReadout(key, onEnter)
+-- The bag click asks in the tooltip (first click) and deletes on the second.
+-- Clicks must never open a Blizzard frame, so no bags and no StaticPopup:
+-- opening the bags from an addon click taints the gamepad controls that come
+-- with them, and Forever then loops forever on the ADDON_ACTION_FORBIDDEN
+-- popup for SetPreferredGamepadInteractTarget.
+local function OnBagClick(readout, mouseButton)
+    if not TallyDB.clickToDelete or IsEditable() then
+        return
+    end
+    if mouseButton == "RightButton" then
+        local target = pendingDelete or Tally.FindCheapestJunk()
+        pendingDelete = nil
+        if target then
+            Tally.SetKept(target.itemID, true)
+            Tally.Print("always keeping %s. /tally keep lists kept items.", target.link)
+        end
+    elseif mouseButton ~= "LeftButton" then
+        return
+    elseif pendingDelete then
+        local target = pendingDelete
+        pendingDelete = nil
+        Tally.DeleteJunk(target)
+    else
+        pendingDelete = Tally.FindCheapestJunk()
+    end
+    ShowBagTooltip(readout)
+end
+
+local function CreateReadout(key, onEnter, onClick)
     local readout = CreateFrame("Frame", "TallyReadout" .. key, container)
     readout:SetHeight(ICON_SIZE)
     readout:EnableMouse(true)
@@ -198,10 +290,25 @@ local function CreateReadout(key, onEnter)
 
     readout:SetScript("OnEnter", onEnter)
     readout:SetScript("OnLeave", function()
+        pendingDelete = nil
         GameTooltip:Hide()
     end)
+    if onClick then
+        readout:SetScript("OnMouseUp", onClick)
+    end
 
     readouts[key] = readout
+    return readout
+end
+
+-- Reagent bag counters are made as bags are equipped, one per reagent bag
+-- slot, and hidden when there are fewer reagent bags than counters.
+local function GetReagentReadout(index)
+    local readout = readouts.reagents[index]
+    if not readout then
+        readout = CreateReadout("Reagents" .. index, ShowReagentTooltip)
+        readouts.reagents[index] = readout
+    end
     return readout
 end
 
@@ -235,7 +342,11 @@ end
 -- row, bottom to top in a column. The container is sized to fit them so the
 -- edit overlay and dragging cover exactly what is on screen.
 local function Layout()
-    local order = { readouts.bags, readouts.ammo }
+    local order = { readouts.bags }
+    for _, readout in ipairs(readouts.reagents) do
+        order[#order + 1] = readout
+    end
+    order[#order + 1] = readouts.ammo
     local visible = {}
     for _, readout in ipairs(order) do
         if readout:IsShown() then
@@ -277,10 +388,30 @@ function ns.display.Refresh()
     readouts.bags:SetShown(TallyDB.showBags)
     SetReadout(readouts.bags, BAG_ICON, BagText(bags), CountColor(bags.free, TallyDB.bagWarning))
 
+    for index = 1, math.max(#bags.reagents, #readouts.reagents) do
+        local entry = bags.reagents[index]
+        local readout = GetReagentReadout(index)
+        readout.entry = entry
+        readout:SetShown(TallyDB.showBags and entry ~= nil)
+        if entry then
+            SetReadout(readout, entry.icon, BagText(entry), CountColor(entry.free, TallyDB.bagWarning))
+        end
+    end
+
     readouts.ammo:SetShown(ammo.shown)
     SetReadout(readouts.ammo, ammo.icon or AMMO_ICON, FormatNumber(ammo.count), CountColor(ammo.count, TallyDB.ammoWarning))
 
     Layout()
+
+    -- Keep an open bag tooltip current, e.g. after a delete.
+    if GameTooltip:IsShown() and GameTooltip:IsOwned(readouts.bags) then
+        ShowBagTooltip(readouts.bags)
+    end
+    for _, readout in ipairs(readouts.reagents) do
+        if readout.entry and GameTooltip:IsShown() and GameTooltip:IsOwned(readout) then
+            ShowReagentTooltip(readout)
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -405,7 +536,7 @@ function ns.display.Create()
     container:SetMovable(true)
     container:SetSize(ICON_SIZE, ICON_SIZE)
 
-    CreateReadout("bags", ShowBagTooltip)
+    CreateReadout("bags", ShowBagTooltip, OnBagClick)
     CreateReadout("ammo", ShowAmmoTooltip)
     container.editOverlay = CreateEditOverlay()
 
