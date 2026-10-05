@@ -216,9 +216,9 @@ end
 local ITEM_QUALITY_POOR = Enum and Enum.ItemQuality and Enum.ItemQuality.Poor or 0
 local ITEM_QUALITY_COMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Common or 1
 
--- White items that are never offered, even when they are the cheapest:
--- the ammo you shoot, quest items and keys.
-local KEEP_WHITE_CLASSES = {
+-- Items that are never offered, even when they are the cheapest: the ammo
+-- you shoot, quest items and keys.
+local NEVER_OFFERED_CLASSES = {
     [ITEM_CLASS_PROJECTILE] = true,
     [ITEM_CLASS_QUEST] = true,
     [ITEM_CLASS_KEY] = true,
@@ -308,22 +308,37 @@ local function GetJunkPrice(itemID, link)
     return vendor, "vendor"
 end
 
+-- Quest starters and quest drops can be grey (Noboru's Cudgel) and are not
+-- always filed under the Quest item class.
+local function IsQuestItem(bag, slot)
+    if C_Container and C_Container.GetContainerItemQuestInfo then
+        local info = C_Container.GetContainerItemQuestInfo(bag, slot)
+        return info ~= nil and (info.isQuestItem or info.questID ~= nil)
+    end
+    if GetContainerItemQuestInfo then
+        local isQuestItem, questID = GetContainerItemQuestInfo(bag, slot)
+        return isQuestItem or questID ~= nil
+    end
+    return false
+end
+
 -- Whether an item may be offered at all, before its price is looked at.
--- Kept items never are. Greys always are. Whites only with the option on,
--- outside the kept categories, and only if a vendor would buy them: that
--- rules out the Hearthstone and other unsellable items.
-local function IsJunkCandidate(itemID, quality)
+-- Kept items never are, nor ammo, quest items, keys or anything a vendor
+-- will not buy (the Hearthstone, special greys). Of the rest, greys always
+-- are; whites only with the option on and outside the kept categories.
+local function IsJunkCandidate(itemID, quality, bag, slot)
     if TallyDB.keep[itemID] then
         return false
     end
-    if quality == ITEM_QUALITY_POOR then
-        return true
-    end
-    if quality ~= ITEM_QUALITY_COMMON or not TallyDB.deleteWhites then
+    local isWhite = quality == ITEM_QUALITY_COMMON and TallyDB.deleteWhites
+    if quality ~= ITEM_QUALITY_POOR and not isWhite then
         return false
     end
     local classID, subclassID = GetItemClass(itemID)
-    if KEEP_WHITE_CLASSES[classID] or KeptWhiteCategory(classID, subclassID) then
+    if NEVER_OFFERED_CLASSES[classID] or (isWhite and KeptWhiteCategory(classID, subclassID)) then
+        return false
+    end
+    if IsQuestItem(bag, slot) then
         return false
     end
     local vendor = GetSellPrice(itemID)
@@ -346,7 +361,7 @@ function Tally.FindCheapestJunk()
     for bag = 0, LastBagIndex() do
         for slot = 1, GetNumSlots(bag) do
             local itemID, count, quality, locked, link = GetBagSlotItem(bag, slot)
-            if itemID and not locked and IsJunkCandidate(itemID, quality) then
+            if itemID and not locked and IsJunkCandidate(itemID, quality, bag, slot) then
                 local price, source = GetJunkPrice(itemID, link)
                 if price and not IsTooValuable(quality, price * count)
                     and (not cheapest or price * count < cheapest.value) then
