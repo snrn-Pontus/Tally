@@ -573,7 +573,9 @@ function ns.display.Refresh()
         local entry = bags.reagents[index]
         local readout = GetReagentReadout(index)
         readout.entry = entry
-        readout:SetShown(TallyDB.showBags and entry ~= nil)
+        -- Reagent-slot bags go with the bag counter; profession bags have
+        -- their own setting.
+        readout:SetShown(entry ~= nil and (entry.professionBag or TallyDB.showBags))
         if entry then
             SetReadout(readout, entry.icon, BagText(entry), CountColor(entry.free, TallyDB.bagWarning))
         end

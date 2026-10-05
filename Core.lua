@@ -441,6 +441,7 @@ end
 --------------------------------------------------------------------------------
 
 local DISENCHANT_SPELL = 13262
+local BAG_FAMILY_ENCHANTING = 0x40
 local ITEM_CLASS_ARMOR = Enum and Enum.ItemClass and Enum.ItemClass.Armor or 4
 local ITEM_QUALITY_UNCOMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Uncommon or 2
 local ITEM_QUALITY_EPIC = Enum and Enum.ItemQuality and Enum.ItemQuality.Epic or 4
@@ -825,76 +826,6 @@ local function IsUpgrade(itemID, link, level, wear)
     return false
 end
 
-local ENCHANTING_SKILL_LINE = 333
-local ENCHANTING_SPELL = 7411
-
--- Enchanting skill Classic asks for to disenchant green gear, by item
--- level. Blue gear needs at least 25 and purple gear from level 56 needs
--- 225. Items past the table are not checked; the game refuses those itself.
-local SKILL_BANDS = {
-    { maxLevel = 20, skill = 1 },
-    { maxLevel = 25, skill = 25 },
-    { maxLevel = 30, skill = 50 },
-    { maxLevel = 35, skill = 75 },
-    { maxLevel = 40, skill = 100 },
-    { maxLevel = 45, skill = 125 },
-    { maxLevel = 50, skill = 150 },
-    { maxLevel = 55, skill = 175 },
-    { maxLevel = 60, skill = 200 },
-    { maxLevel = 65, skill = 225 },
-    { maxLevel = 99, skill = 225 },
-}
-
-local function RequiredSkill(level, quality)
-    if not level then
-        return nil
-    end
-    for _, band in ipairs(SKILL_BANDS) do
-        if level <= band.maxLevel then
-            local skill = band.skill
-            if quality == ITEM_QUALITY_EPIC and level >= 56 then
-                skill = math.max(skill, 225)
-            elseif quality and quality > ITEM_QUALITY_UNCOMMON then
-                skill = math.max(skill, 25)
-            end
-            return skill
-        end
-    end
-    return nil
-end
-
--- Your Enchanting skill, or nil when it cannot be read (nothing is ruled
--- out then).
-local function GetEnchantingSkill()
-    if GetProfessions and GetProfessionInfo then
-        local professions = { GetProfessions() }
-        for i = 1, select("#", GetProfessions()) do
-            if professions[i] then
-                local _, _, rank, _, _, _, skillLine = GetProfessionInfo(professions[i])
-                if skillLine == ENCHANTING_SKILL_LINE then
-                    return rank
-                end
-            end
-        end
-    end
-    if GetNumSkillLines and GetSkillLineInfo then
-        local enchanting = (C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(ENCHANTING_SPELL))
-            or (GetSpellInfo and GetSpellInfo(ENCHANTING_SPELL)) or "Enchanting"
-        for i = 1, GetNumSkillLines() do
-            local name, isHeader, _, rank = GetSkillLineInfo(i)
-            if not isHeader and name == enchanting then
-                return rank
-            end
-        end
-    end
-    return nil
-end
-
-local function SkillTooLow(level, quality, skill)
-    local required = RequiredSkill(level, quality)
-    return skill ~= nil and required ~= nil and skill < required
-end
-
 -- Items that free a slot first, then the one worth least at a vendor.
 local function IsBetterTarget(candidate, best)
     if not best then
@@ -920,7 +851,14 @@ local function FindDisenchants(bags)
         return result
     end
     result.tight = bags.free <= (TallyDB.bagWarning or 0)
-    local skill = GetEnchantingSkill()
+    -- Enchanting bags take dust, essences, shards and crystals. A disenchant
+    -- rolls one of its materials, so one free slot there is enough.
+    local enchantingFree = 0
+    for _, entry in ipairs(bags.list) do
+        if entry.family and bit and bit.band(entry.family, BAG_FAMILY_ENCHANTING) ~= 0 then
+            enchantingFree = enchantingFree + entry.free
+        end
+    end
 
     local held = {}
     local candidates = {}
@@ -931,8 +869,7 @@ local function FindDisenchants(bags)
                 held[itemID] = held[itemID] or { count = 0, stacks = 0 }
                 held[itemID].count = held[itemID].count + count
                 held[itemID].stacks = held[itemID].stacks + 1
-                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot)
-                    and not SkillTooLow(GetItemLevel(itemID, link), quality, skill) then
+                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot) then
                     local wear = WearState(bag, slot, itemID)
                     local candidate = {
                         bag = bag,
@@ -961,7 +898,7 @@ local function FindDisenchants(bags)
 
     for _, candidate in ipairs(candidates) do
         -- A slot is only freed for sure when every possible result fits in
-        -- the stacks you carry.
+        -- the stacks you carry, or in a free enchanting bag slot.
         local materials = PossibleMaterials(GetItemClass(candidate.itemID), candidate.quality, candidate.level)
         candidate.material = materials and materials[1][1]
         candidate.freesSlot = materials ~= nil
@@ -969,7 +906,7 @@ local function FindDisenchants(bags)
             local material, kind, most = entry[1], entry[2], entry[3]
             local stacks = held[material]
             local room = stacks and stacks.stacks * GetMaxStack(material, kind) - stacks.count or 0
-            if room < most then
+            if room < most and enchantingFree == 0 then
                 candidate.freesSlot = false
             end
         end
@@ -1005,10 +942,6 @@ function Tally.PrepareDisenchant(target, requireSafe)
     end
     if not IsDisenchantCandidate(itemID, quality, target.bag, target.slot) then
         Print("%s is no longer offered, nothing disenchanted.", target.link)
-        return nil
-    end
-    if SkillTooLow(target.level, quality, GetEnchantingSkill()) then
-        Print("%s needs more Enchanting skill, nothing disenchanted.", target.link)
         return nil
     end
     local wear = WearState(target.bag, target.slot, itemID)
@@ -1078,6 +1011,7 @@ local function Recount()
                 ammoBag = isAmmoBag,
                 reagentBag = isReagentBag,
                 professionBag = isProfessionBag,
+                family = family,
                 separate = (isReagentBag and separateReagents) or (isProfessionBag and separateProfession) or false,
             }
             bags.list[#bags.list + 1] = entry
@@ -1283,7 +1217,6 @@ frame:RegisterEvent("BAG_UPDATE_DELAYED")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 frame:RegisterEvent("SPELLS_CHANGED")
-pcall(frame.RegisterEvent, frame, "SKILL_LINES_CHANGED")
 -- The disenchant button is secure: it is put away as combat starts and
 -- brought back after.
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")

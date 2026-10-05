@@ -54,11 +54,9 @@ With Enchanting learned, a disenchant counter shows how many soulbound green, bl
 Disenchanting frees the item's slot, but the materials need a slot too unless they stack with ones you already carry. Tally knows what Classic gear most likely disenchants into (dust for armor, essence for weapons, shards for rare items, by item level) and checks whether your stacks have room for it:
 
 - **Bags not tight** (more free slots than **Yellow at free slots**): every soulbound item counts. Items that free a slot are offered first, then the one worth least at a vendor.
-- **Bags getting full**: only items whose every possible result (dust, essence or shard for green gear; shard or Nexus Crystal for blue and purple) stacks with yours count, so every disenchant frees a slot.
+- **Bags getting full**: only items whose every possible result (dust, essence or shard for green gear; shard or Nexus Crystal for blue and purple) stacks with yours count, so every disenchant frees a slot. A free slot in an enchanting bag counts too, since the materials can go there.
 
 Gear better than what you wear is never offered: with **Never disenchant upgrades** on (the default), an item counts as an upgrade when it has a higher item level than the weakest item in its slot (both rings, both trinkets), or that slot is empty. With **Pawn** installed, Pawn's upgrade arrow decides instead. Items you cannot wear (red text on the tooltip: wrong armor type, class or level) are never upgrades. The tooltip lists the items held back and why.
-
-Items above your Enchanting skill for their item level are not counted.
 
 The tooltip says which material is likely and whether it frees a slot. Items past the Classic item levels have no known result and are only offered while space is no issue.
 
