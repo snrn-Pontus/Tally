@@ -591,8 +591,9 @@ local function IsDisenchantCandidate(itemID, quality, bag, slot)
     return IsSoulboundAndDisenchantable(bag, slot) and not IsQuestItem(bag, slot)
 end
 
--- Where each kind of gear goes. One-handers also count the off hand, but
--- only when a weapon is in it, so a shield is not compared with a sword.
+-- Where each kind of gear goes. One-handers also count the off hand when a
+-- weapon is in it, or it is empty and you can dual wield, so a shield is
+-- not compared with a sword.
 local EQUIP_SLOTS = {
     INVTYPE_HEAD = { 1 }, INVTYPE_NECK = { 2 }, INVTYPE_SHOULDER = { 3 },
     INVTYPE_BODY = { 4 }, INVTYPE_CHEST = { 5 }, INVTYPE_ROBE = { 5 },
@@ -605,6 +606,21 @@ local EQUIP_SLOTS = {
     INVTYPE_TABARD = { 19 },
 }
 local OFF_HAND_SLOT = 17
+local MAIN_HAND_SLOT = 16
+
+-- Whether a one-handed weapon could go in your empty off hand.
+local function CanOffHandWeapon()
+    if not CanDualWield or not CanDualWield() then
+        return false
+    end
+    local mainHand = GetInventoryItemID("player", MAIN_HAND_SLOT)
+    if not mainHand then
+        return true
+    end
+    local getter = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+    local equipLoc = getter and select(4, getter(mainHand))
+    return equipLoc ~= "INVTYPE_2HWEAPON"
+end
 
 -- A broken item's durability line is red, but it can be repaired.
 local DURABILITY_PATTERN = "^" .. (DURABILITY_TEMPLATE or "Durability %d / %d"):gsub("%%d", "%%d+") .. "$"
@@ -749,9 +765,15 @@ local function IsUpgrade(itemID, link, level, wear)
     end
     for _, inventorySlot in ipairs(slots) do
         local equipped = GetInventoryItemLink("player", inventorySlot)
-        if inventorySlot == OFF_HAND_SLOT and equipLoc == "INVTYPE_WEAPON"
-            and (not equipped or GetItemClass(GetInventoryItemID("player", inventorySlot)) ~= ITEM_CLASS_WEAPON) then
-            -- A shield, off-hand item or nothing there: not compared.
+        if inventorySlot == OFF_HAND_SLOT and equipLoc == "INVTYPE_WEAPON" and not equipped then
+            -- An empty off hand only takes this one-hander if you can dual
+            -- wield and are not holding a two-hander.
+            if CanOffHandWeapon() then
+                return true, "empty slot"
+            end
+        elseif inventorySlot == OFF_HAND_SLOT and equipLoc == "INVTYPE_WEAPON"
+            and GetItemClass(GetInventoryItemID("player", inventorySlot)) ~= ITEM_CLASS_WEAPON then
+            -- A shield or off-hand item there: not compared.
         elseif not equipped then
             return true, "empty slot"
         else
