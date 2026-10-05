@@ -462,7 +462,7 @@ local function Recount()
                 icon = itemID and GetItemIcon(itemID) or "Interface\\Icons\\INV_Misc_Bag_08",
                 free = free,
                 total = slots,
-                special = family ~= 0,
+                special = family ~= 0 and not isReagentBag,
                 ammoBag = isAmmoBag,
                 reagentBag = isReagentBag,
                 separate = isReagentBag and separateReagents,
@@ -473,9 +473,9 @@ local function Recount()
             end
 
             -- Only bags that hold anything count: a free quiver slot cannot
-            -- take the loot that just filled your bags. Reagent bags with
-            -- their own counters are left out of this one.
-            if family == 0 and not entry.separate then
+            -- take the loot that just filled your bags. Reagent bags count,
+            -- whatever their family, unless they have their own counters.
+            if (family == 0 or isReagentBag) and not entry.separate then
                 bags.free = bags.free + free
                 bags.total = bags.total + slots
             end
