@@ -1,5 +1,9 @@
 # Tally changelog
 
+## 0.3.1
+
+- Fixed: a soul bag could count as free bag space when the game reported it as a bag that holds anything. Tally now also checks the bag item itself, so soul and other profession bags stay out of the bag counter.
+
 ## 0.3.0
 
 - **Profession bags get their own counter.** Herb, enchanting, soul and other profession bags each show a counter with the bag's icon, so you can see your herb bag has room even when your bags are full. They are still left out of the bag counter. **Own counter for profession bags** turns it off.
