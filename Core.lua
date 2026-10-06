@@ -92,6 +92,7 @@ end
 
 local ITEM_CLASS_WEAPON = Enum and Enum.ItemClass and Enum.ItemClass.Weapon or 2
 local ITEM_CLASS_PROJECTILE = Enum and Enum.ItemClass and Enum.ItemClass.Projectile or 6
+local ITEM_CLASS_CONTAINER = Enum and Enum.ItemClass and Enum.ItemClass.Container or 1
 local ITEM_CLASS_QUIVER = Enum and Enum.ItemClass and Enum.ItemClass.Quiver or 11
 local ITEM_CLASS_QUEST = Enum and Enum.ItemClass and Enum.ItemClass.Questitem or 12
 local ITEM_CLASS_KEY = Enum and Enum.ItemClass and Enum.ItemClass.Key or 13
@@ -168,6 +169,36 @@ local function GetFreeSlots(bag)
         return free or 0, family or 0
     end
     return 0, 0
+end
+
+-- Family bits for the container subclasses (soul, herb, enchanting, ...).
+local CONTAINER_SUBCLASS_FAMILY = {
+    [1] = 0x4,    -- soul bag
+    [2] = 0x20,   -- herb bag
+    [3] = 0x40,   -- enchanting bag
+    [4] = 0x80,   -- engineering bag
+    [5] = 0x200,  -- gem bag
+    [6] = 0x400,  -- mining bag
+    [7] = 0x8,    -- leatherworking bag
+    [8] = 0x10,   -- inscription bag
+}
+
+-- The client can report family 0 for a bag that only holds one kind of item
+-- (a soul bag counted as free space), so fall back to the bag item itself.
+local function GetBagFamily(itemID, family)
+    if family ~= 0 or not itemID then
+        return family
+    end
+    local getter = (C_Item and C_Item.GetItemFamily) or GetItemFamily
+    local itemFamily = getter and getter(itemID)
+    if itemFamily and itemFamily ~= 0 then
+        return itemFamily
+    end
+    local classID, subclassID = GetItemClass(itemID)
+    if classID == ITEM_CLASS_CONTAINER and subclassID then
+        return CONTAINER_SUBCLASS_FAMILY[subclassID] or 0
+    end
+    return 0
 end
 
 -- Bag slots past the regular four (Enum.BagIndex.ReagentBag) only take
@@ -995,6 +1026,9 @@ local function Recount()
             local free, family = GetFreeSlots(bag)
             local classID = GetItemClass(itemID)
             local isAmmoBag = classID == ITEM_CLASS_QUIVER
+            if not isAmmoBag then
+                family = GetBagFamily(itemID, family)
+            end
             local isReagentBag = IsReagentBag(bag)
             -- Herb, enchanting, soul and other profession bags only take
             -- their own kind of item, so they may have room when your bags
