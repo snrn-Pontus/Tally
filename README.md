@@ -45,10 +45,10 @@ If **Auctionator**, **TradeSkillMaster** or **Auctioneer** is installed, a grey 
 
 ## Disenchanting
 
-With Enchanting learned, a disenchant counter shows how many soulbound green, blue and purple weapons and armor are in your bags. Bind-on-equip and account-bound items are left alone, since they can still be sold or used by another character. Hover it to see what a click would disenchant:
+With Enchanting learned, a disenchant counter shows how many soulbound green, blue and purple weapons and armor, and bind-on-equip green weapons and armor, are in your bags. It stays in place with nothing to disenchant (greyed out at 0), so it is there the moment loot comes in. Bind-on-equip blue and purple items and account-bound items are left alone, since they can still be sold or used by another character. Hover it to see what a click would disenchant:
 
 - **Click** disenchants soulbound gear you can never wear: another class's item, or an armor or weapon type your class never learns (plate on a rogue, a wand on a warrior). It is only good for materials, so there is no confirmation.
-- **Shift-click** disenchants gear you could wear, now or later: once you reach its level, or train its proficiency (mail or plate at 40, a weapon skill from a weapon master). The modifier keeps that from happening by accident.
+- **Shift-click** disenchants gear you could wear, now or later: once you reach its level, or train its proficiency (mail or plate at 40, a weapon skill from a weapon master). The modifier keeps that from happening by accident. With no soulbound gear left, shift-click disenchants a bind-on-equip green instead, to clear bag space quickly in a dungeon.
 - **Right-click** (or shift-right-click) always keeps that item instead, on the same keep list as greys.
 
 Disenchanting frees the item's slot, but the materials need a slot too unless they stack with ones you already carry. Tally knows what Classic gear most likely disenchants into (dust for armor, essence for weapons, shards for rare items, by item level) and checks whether your stacks have room for it:

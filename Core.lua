@@ -540,30 +540,38 @@ local function ScanBagItem(bag, slot)
     return scanTooltip
 end
 
--- Bound to you alone and not marked "Cannot be disenchanted". C_Item.IsBound
--- is also true for account-bound items, which another character could
--- still use, so the tooltip has to say "Soulbound".
-local function IsSoulboundAndDisenchantable(bag, slot)
+-- How an item that can be disenchanted is bound: "soulbound" when bound to
+-- you alone, "equip" when it still binds when equipped, nil otherwise (marked
+-- "Cannot be disenchanted", or account-bound). C_Item.IsBound is also true for
+-- account-bound items, which another character could still use, so the
+-- tooltip has to say "Soulbound".
+local function GetDisenchantBinding(bag, slot)
+    local bound
     if C_Item and C_Item.IsBound and ItemLocation and ItemLocation.CreateFromBagAndSlot then
-        local ok, bound = pcall(C_Item.IsBound, ItemLocation:CreateFromBagAndSlot(bag, slot))
-        if ok and not bound then
-            return false
+        local ok, result = pcall(C_Item.IsBound, ItemLocation:CreateFromBagAndSlot(bag, slot))
+        if ok then
+            bound = result
         end
     end
     local tooltip = ScanBagItem(bag, slot)
-    local soulbound = false
+    local binding
     for i = 2, tooltip:NumLines() do
         local line = _G["TallyScanTooltipTextLeft" .. i]
         local text = line and line:GetText()
         if text == (ITEM_SOULBOUND or "Soulbound") then
-            soulbound = true
+            binding = "soulbound"
+        elseif text == (ITEM_BIND_ON_EQUIP or "Binds when equipped") then
+            binding = "equip"
         elseif text == (ITEM_DISENCHANT_NOT_DISENCHANTABLE or "Cannot be disenchanted") then
-            soulbound = false
+            binding = nil
             break
         end
     end
     tooltip:Hide()
-    return soulbound
+    if (binding == "soulbound" and bound == false) or (binding == "equip" and bound == true) then
+        return nil
+    end
+    return binding
 end
 
 local function GetItemLevel(itemID, link)
@@ -615,20 +623,30 @@ local function PossibleMaterials(classID, quality, level)
 end
 
 -- Soulbound green, blue and purple weapons and armor: they cannot go to the
--- auction house, so disenchanting them loses only vendor money. Kept items
--- and quest items are never offered.
+-- auction house, so disenchanting them loses only vendor money. Unbound
+-- bind-on-equip greens are offered too, for a shift-click only, since they
+-- are worth little on the auction house when bags are full in a dungeon.
+-- Kept items and quest items are never offered. Returns the binding
+-- ("soulbound" or "equip"), or nil.
 local function IsDisenchantCandidate(itemID, quality, bag, slot)
     if TallyDB.keep[itemID] or not quality then
-        return false
+        return nil
     end
     if quality < ITEM_QUALITY_UNCOMMON or quality > ITEM_QUALITY_EPIC then
-        return false
+        return nil
     end
     local classID = GetItemClass(itemID)
     if classID ~= ITEM_CLASS_WEAPON and classID ~= ITEM_CLASS_ARMOR then
-        return false
+        return nil
     end
-    return IsSoulboundAndDisenchantable(bag, slot) and not IsQuestItem(bag, slot)
+    local binding = GetDisenchantBinding(bag, slot)
+    if binding == "equip" and quality ~= ITEM_QUALITY_UNCOMMON then
+        return nil
+    end
+    if not binding or IsQuestItem(bag, slot) then
+        return nil
+    end
+    return binding
 end
 
 -- Where each kind of gear goes. One-handers also count the off hand when a
@@ -869,15 +887,16 @@ local function IsBetterTarget(candidate, best)
 end
 
 -- Every item you could disenchant, split into safe ones (soulbound gear you
--- can never wear, only good for materials) and the rest, with the one of
--- each to offer. Disenchanting frees the item's slot, but the materials take
--- a new slot unless they stack with what you carry. With room to spare
+-- can never wear, only good for materials), soulbound gear you could wear
+-- and bind-on-equip greens, with the one of each to offer. Disenchanting
+-- frees the item's slot, but the materials take a new slot unless they
+-- stack with what you carry. With room to spare
 -- (more free slots than the yellow warning) every candidate counts; with
 -- bags getting full only items whose every possible material has room for a full
 -- result in your stacks count. Upgrades over what you wear are held back
 -- and listed instead.
 local function FindDisenchants(bags)
-    local result = { known = Tally.KnowsDisenchant(), count = 0, safeCount = 0, upgrades = {} }
+    local result = { known = Tally.KnowsDisenchant(), count = 0, safeCount = 0, boeCount = 0, upgrades = {} }
     if not TallyDB or not result.known then
         return result
     end
@@ -900,7 +919,8 @@ local function FindDisenchants(bags)
                 held[itemID] = held[itemID] or { count = 0, stacks = 0 }
                 held[itemID].count = held[itemID].count + count
                 held[itemID].stacks = held[itemID].stacks + 1
-                if not locked and IsDisenchantCandidate(itemID, quality, bag, slot) then
+                local binding = not locked and IsDisenchantCandidate(itemID, quality, bag, slot)
+                if binding then
                     local wear = WearState(bag, slot, itemID)
                     local candidate = {
                         bag = bag,
@@ -910,7 +930,8 @@ local function FindDisenchants(bags)
                         link = link or GetItemName(itemID),
                         level = GetItemLevel(itemID, link),
                         value = GetSellPrice(itemID) or 0,
-                        safe = wear == "never",
+                        safe = binding == "soulbound" and wear == "never",
+                        boe = binding == "equip",
                     }
                     local upgrade, reason
                     if TallyDB.keepUpgrades then
@@ -941,7 +962,14 @@ local function FindDisenchants(bags)
                 candidate.freesSlot = false
             end
         end
-        if candidate.freesSlot or not result.tight then
+        if candidate.boe then
+            if candidate.freesSlot or not result.tight then
+                result.boeCount = result.boeCount + 1
+                if IsBetterTarget(candidate, result.boeTarget) then
+                    result.boeTarget = candidate
+                end
+            end
+        elseif candidate.freesSlot or not result.tight then
             result.count = result.count + 1
             if candidate.safe then
                 result.safeCount = result.safeCount + 1
@@ -957,8 +985,8 @@ local function FindDisenchants(bags)
 end
 
 -- Rechecks the offered item as it is clicked: still in its slot, still
--- offered, not an upgrade and, for a plain click, still gear you can never
--- wear. Returns the macro for the disenchant button, or nil.
+-- offered, not an upgrade and, for a plain click, still soulbound gear you
+-- can never wear. Returns the macro for the disenchant button, or nil.
 function Tally.PrepareDisenchant(target, requireSafe)
     if GetCursorInfo() then
         Print("put down what you are holding first.")
@@ -971,8 +999,13 @@ function Tally.PrepareDisenchant(target, requireSafe)
         Print("that item moved, nothing disenchanted.")
         return nil
     end
-    if not IsDisenchantCandidate(itemID, quality, target.bag, target.slot) then
+    local binding = IsDisenchantCandidate(itemID, quality, target.bag, target.slot)
+    if not binding then
         Print("%s is no longer offered, nothing disenchanted.", target.link)
+        return nil
+    end
+    if requireSafe and binding == "equip" then
+        Print("%s is bind on equip: shift-click to disenchant it.", target.link)
         return nil
     end
     local wear = WearState(target.bag, target.slot, itemID)
@@ -1160,8 +1193,9 @@ local function PrintStatus()
     end
     local disenchant = Tally.disenchant
     if disenchant.known then
-        Print("disenchant: %d %s%s", disenchant.count, disenchant.count == 1 and "item" or "items",
-            disenchant.tight and " that free a slot" or "")
+        Print("disenchant: %d soulbound %s and %d bind-on-equip %s%s", disenchant.count,
+            disenchant.count == 1 and "item" or "items", disenchant.boeCount,
+            disenchant.boeCount == 1 and "green" or "greens", disenchant.tight and " that free a slot" or "")
     end
 end
 

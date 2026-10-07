@@ -22,6 +22,7 @@ local DISENCHANT_ICON = "Interface\\Icons\\INV_Enchant_Disenchant"
 local COLOR_NORMAL = { 1, 1, 1 }
 local COLOR_WARNING = { 1, 0.82, 0 }
 local COLOR_EMPTY = { 1, 0.28, 0.28 }
+local COLOR_DIM = { 0.62, 0.62, 0.62 }
 
 -- Native crossbar art (Blizzard_GamepadActionBars), with the addon's own
 -- textures as fallback on builds without these atlases.
@@ -192,10 +193,13 @@ end
 local function ShowDisenchantTooltip(owner)
     local disenchant = Tally.disenchant
     local count = disenchant.count
+    local boeCount = disenchant.boeCount or 0
     local items = count == 1 and "item" or "items"
     GameTooltip:SetOwner(owner, "ANCHOR_TOPLEFT")
     GameTooltip:SetText(IconText(Tally.GetDisenchantIcon() or DISENCHANT_ICON, "Disenchant"), 1, 1, 1)
-    if disenchant.tight then
+    if count + boeCount == 0 then
+        GameTooltip:AddLine(disenchant.tight and "Nothing to disenchant that frees a bag slot." or "Nothing to disenchant.", 0.62, 0.62, 0.62, true)
+    elseif disenchant.tight then
         GameTooltip:AddLine(string.format("%d soulbound %s that free a bag slot", count, items), nil, nil, nil, true)
     else
         GameTooltip:AddLine(string.format("%d soulbound %s you can disenchant", count, items), nil, nil, nil, true)
@@ -203,10 +207,13 @@ local function ShowDisenchantTooltip(owner)
     if disenchant.safeCount > 0 and disenchant.safeCount < count then
         GameTooltip:AddLine(string.format("%d of them you can never wear", disenchant.safeCount), nil, nil, nil, true)
     end
+    if boeCount > 0 then
+        GameTooltip:AddLine(string.format("%d bind-on-equip %s", boeCount, boeCount == 1 and "green" or "greens"), nil, nil, nil, true)
+    end
     GameTooltip:AddLine(" ")
     if InCombatLockdown() then
         GameTooltip:AddLine("Disenchanting waits until you leave combat.", 0.62, 0.62, 0.62, true)
-    else
+    elseif count + boeCount > 0 then
         if disenchant.safeTarget then
             GameTooltip:AddLine("Click: gear you can never wear", 0.62, 0.62, 0.62)
             AddDisenchantTarget(disenchant.safeTarget)
@@ -217,6 +224,12 @@ local function ShowDisenchantTooltip(owner)
             end
             GameTooltip:AddLine("Shift-click: gear you could wear", 1, 0.82, 0)
             AddDisenchantTarget(disenchant.unsafeTarget)
+        elseif disenchant.boeTarget then
+            if disenchant.safeTarget then
+                GameTooltip:AddLine(" ")
+            end
+            GameTooltip:AddLine("Shift-click: bind-on-equip green", 1, 0.82, 0)
+            AddDisenchantTarget(disenchant.boeTarget)
         end
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Right-click (or shift-right-click) to always keep the item instead.", 0.62, 0.62, 0.62, true)
@@ -317,8 +330,8 @@ end
 
 -- Casting needs a secure button, so the disenchant counter gets one laid
 -- over it. A plain click disenchants soulbound gear you can never wear,
--- which is safe to do at once. Gear you could wear takes a shift-click, so
--- it is never disenchanted by accident. PreClick checks the item again and
+-- which is safe to do at once. Gear you could wear, and then bind-on-equip
+-- greens, take a shift-click, so they are never disenchanted by accident. PreClick checks the item again and
 -- sets "/cast Disenchant" and "/use bag slot" for the secure handler to
 -- run; PostClick clears it.
 local function OnDisenchantPreClick(self, mouseButton)
@@ -334,7 +347,7 @@ local function OnDisenchantPreClick(self, mouseButton)
     local shift = IsShiftKeyDown()
     local target
     if shift then
-        target = disenchant.unsafeTarget or disenchant.safeTarget
+        target = disenchant.unsafeTarget or disenchant.safeTarget or disenchant.boeTarget
     else
         target = disenchant.safeTarget
     end
@@ -347,6 +360,10 @@ local function OnDisenchantPreClick(self, mouseButton)
         if not target then
             if disenchant.unsafeTarget then
                 Tally.Print("everything left is gear you could wear: shift-click to disenchant %s.", disenchant.unsafeTarget.link)
+            elseif disenchant.boeTarget then
+                Tally.Print("everything left is bind on equip: shift-click to disenchant %s.", disenchant.boeTarget.link)
+            else
+                Tally.Print("nothing to disenchant.")
             end
             return
         end
@@ -582,8 +599,12 @@ function ns.display.Refresh()
     end
 
     local disenchant = Tally.disenchant
-    readouts.disenchant:SetShown(TallyDB.showDisenchant and disenchant.known and disenchant.count > 0)
-    SetReadout(readouts.disenchant, Tally.GetDisenchantIcon() or DISENCHANT_ICON, tostring(disenchant.count), COLOR_NORMAL)
+    -- Shown even with nothing to offer, so it does not jump around the
+    -- corner as loot comes in.
+    local disenchantCount = disenchant.count + (disenchant.boeCount or 0)
+    readouts.disenchant:SetShown(TallyDB.showDisenchant and disenchant.known)
+    SetReadout(readouts.disenchant, Tally.GetDisenchantIcon() or DISENCHANT_ICON, tostring(disenchantCount),
+        disenchantCount > 0 and COLOR_NORMAL or COLOR_DIM)
 
     readouts.ammo:SetShown(ammo.shown)
     SetReadout(readouts.ammo, ammo.icon or AMMO_ICON, FormatNumber(ammo.count), CountColor(ammo.count, TallyDB.ammoWarning))
