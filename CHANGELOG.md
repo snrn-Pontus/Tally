@@ -1,5 +1,10 @@
 # Tally changelog
 
+## 0.4.0
+
+- **The disenchant counter is always shown** with Enchanting learned, greyed out at 0, so it is there the moment loot comes in.
+- **Shift-click disenchants bind-on-equip greens** once no soulbound gear is left, to free bag space quickly in a dungeon. They are counted on the counter and listed in the tooltip; a plain click never disenchants them. Bind-on-equip blue and purple items are still left alone.
+
 ## 0.3.1
 
 - Fixed: a soul bag could count as free bag space when the game reported it as a bag that holds anything. Tally now also checks the bag item itself, so soul and other profession bags stay out of the bag counter.

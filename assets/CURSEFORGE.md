@@ -6,6 +6,7 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 ## What's new
 
+- **0.4.0**: The disenchant counter is always shown, greyed out at 0. Shift-click disenchants bind-on-equip greens once no soulbound gear is left, to clear bag space fast in a dungeon.
 - **0.3.1**: Fixed a soul bag counting as free bag space.
 - **0.3.0**: A disenchant counter for enchanters. Click to disenchant soulbound gear you can never wear, shift-click for gear you could; upgrades are never touched, and with full bags it only offers disenchants that free a slot. Herb, enchanting, soul and other profession bags get a counter of their own.
 - **0.2.0**: Click the bag counter to delete your cheapest grey item, confirmed in the tooltip. Reagent bags can get their own counter. Fixed a phantom "?" ammo counter with no ammo equipped.
@@ -22,7 +23,7 @@ Full history on the Changelog tab of each file.
 | --- | --- |
 | Bags | Free slots in your backpack and normal bags |
 | Profession bag | Free slots in a herb, enchanting, soul or other profession bag, with its icon |
-| Disenchant | Soulbound gear you can disenchant, when you know Enchanting |
+| Disenchant | Soulbound gear and bind-on-equip greens you can disenchant, when you know Enchanting |
 | Ammo | Every arrow or bullet of the equipped type in your bags |
 
 - Yellow when low, red at zero. Both thresholds are yours to set.
@@ -42,12 +43,12 @@ The bag tooltip names your cheapest grey item. Click the bag counter and the too
 
 ## Disenchant
 
-With Enchanting learned, a counter shows the soulbound green, blue and purple weapons and armor you can disenchant. Hover it to see what a click would do.
+With Enchanting learned, a counter shows the soulbound green, blue and purple weapons and armor, and bind-on-equip green weapons and armor, you can disenchant. It stays put at 0, so it is there the moment loot comes in. Hover it to see what a click would do.
 
 - **Click** disenchants gear you can never wear: another class's item, or an armor or weapon type your class never learns.
-- **Shift-click** disenchants gear you could wear, now or after leveling or training. The modifier keeps it from happening by accident.
+- **Shift-click** disenchants gear you could wear, now or after leveling or training, then bind-on-equip greens once no soulbound gear is left. The modifier keeps it from happening by accident.
 - **Upgrades are never offered**: Pawn's upgrade arrow when Pawn is installed, otherwise item level against what you wear.
-- Bind-on-equip, account-bound and "Cannot be disenchanted" items are never offered. Right-click to always keep an item.
+- Bind-on-equip blue and purple, account-bound and "Cannot be disenchanted" items are never offered. Right-click to always keep an item.
 - When your bags are nearly full, only disenchants whose every possible material stacks with yours (or fits in an enchanting bag) are offered, so each one frees a slot.
 
 ## Setup
