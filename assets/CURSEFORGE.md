@@ -6,12 +6,10 @@ In gamepad mode the crossbar replaces the bag bar and the Shoot button, so nothi
 
 ## What's new
 
+- **0.4.1**: Fixed a soul bag in the fifth bag slot counting as free bag space.
 - **0.4.0**: The disenchant counter is always shown, greyed out at 0. Shift-click disenchants bind-on-equip greens once no soulbound gear is left, to clear bag space fast in a dungeon.
 - **0.3.1**: Fixed a soul bag counting as free bag space.
 - **0.3.0**: A disenchant counter for enchanters. Click to disenchant soulbound gear you can never wear, shift-click for gear you could; upgrades are never touched, and with full bags it only offers disenchants that free a slot. Herb, enchanting, soul and other profession bags get a counter of their own.
-- **0.2.0**: Click the bag counter to delete your cheapest grey item, confirmed in the tooltip. Reagent bags can get their own counter. Fixed a phantom "?" ammo counter with no ammo equipped.
-- **0.1.1**: Clicking the bag counter no longer freezes the game in gamepad mode. The counters are hover-only now.
-- **0.1.0**: First release.
 
 Full history on the Changelog tab of each file.
 

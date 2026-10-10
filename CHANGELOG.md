@@ -1,5 +1,9 @@
 # Tally changelog
 
+## 0.4.1
+
+- Fixed: a soul bag in the fifth bag slot counted as free bag space. Tally took any bag past the fourth slot for a reagent bag; it now checks the bag itself. Soul bags are also recognised when the game reports them as plain bags.
+
 ## 0.4.0
 
 - **The disenchant counter is always shown** with Enchanting learned, greyed out at 0, so it is there the moment loot comes in.
