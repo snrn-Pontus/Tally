@@ -215,10 +215,18 @@ local function GetBagFamily(itemID, family)
     return 0
 end
 
--- Bag slots past the regular four (Enum.BagIndex.ReagentBag) only take
--- reagents.
-local function IsReagentBag(bag)
-    return bag > (NUM_BAG_SLOTS or 4)
+-- Container subclass of a reagent bag (retail's reagent bag slot).
+local CONTAINER_SUBCLASS_REAGENT = 11
+
+-- A reagent bag sits past the regular four bag slots and is a reagent bag
+-- item. Forever's fifth bag slot takes any bag, so the slot alone is not
+-- enough: a soul pouch there counted as reagent space.
+local function IsReagentBag(bag, itemID)
+    if bag <= (NUM_BAG_SLOTS or 4) then
+        return false
+    end
+    local classID, subclassID = GetItemClass(itemID)
+    return classID == ITEM_CLASS_CONTAINER and subclassID == CONTAINER_SUBCLASS_REAGENT
 end
 
 local function GetBagItemID(bag)
@@ -1076,7 +1084,7 @@ local function Recount()
             if not isAmmoBag then
                 family = GetBagFamily(itemID, family)
             end
-            local isReagentBag = IsReagentBag(bag)
+            local isReagentBag = IsReagentBag(bag, itemID)
             -- Herb, enchanting, soul and other profession bags only take
             -- their own kind of item, so they may have room when your bags
             -- are full. Quivers and ammo pouches show on the ammo counter.
