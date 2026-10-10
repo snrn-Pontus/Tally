@@ -183,11 +183,25 @@ local CONTAINER_SUBCLASS_FAMILY = {
     [8] = 0x10,   -- inscription bag
 }
 
+-- Soul bags by item ID, for when the client reports them as plain bags at
+-- every level (family, item family and container subclass).
+local SOUL_BAGS = {
+    [21340] = true, -- Soul Pouch
+    [21341] = true, -- Felcloth Bag
+    [21342] = true, -- Core Felcloth Bag
+    [21872] = true, -- Ebon Shadowbag
+    [22243] = true, -- Small Soul Pouch
+    [22244] = true, -- Box of Souls
+}
+
 -- The client can report family 0 for a bag that only holds one kind of item
 -- (a soul bag counted as free space), so fall back to the bag item itself.
 local function GetBagFamily(itemID, family)
     if family ~= 0 or not itemID then
         return family
+    end
+    if SOUL_BAGS[itemID] then
+        return CONTAINER_SUBCLASS_FAMILY[1]
     end
     local getter = (C_Item and C_Item.GetItemFamily) or GetItemFamily
     local itemFamily = getter and getter(itemID)
